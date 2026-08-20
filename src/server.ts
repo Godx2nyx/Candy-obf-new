@@ -36,6 +36,8 @@ app.post("/api/obfuscate", (req, res) => {
       rename:        options?.rename        !== false,
       encodeStrings: options?.encodeStrings !== false,
       minify:        options?.minify        === true,
+      vmType:        options?.vmType        ?? "register",
+      vmLevel:       options?.vmLevel       ?? "max",
       seed:          options?.seed
     }
 
@@ -56,5 +58,5 @@ app.get("/api/status", (req, res) => {
 app.get("/ping", (req, res) => res.send("pong"))
 
 app.listen(PORT, () => {
-  console.log(` Candy Obfuscator running on port ${PORT}`)
+  console.log(`Candy Obfuscator running on port ${PORT}`)
 })
