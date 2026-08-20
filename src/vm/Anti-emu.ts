@@ -1,11 +1,3 @@
-// ====== ANTI-EMU TECHNIQUES ======
-// Based on analysis of Goofy EMU:
-// - clock/tick/time always return 0
-// - debug = nil
-// - dispatch pattern analysis
-// - upvalue inspection
-// - coroutine tracing
-
 import { mulberry32 } from "./utils"
 
 export interface AntiEmuConfig {
