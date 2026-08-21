@@ -2,11 +2,15 @@ import * as AST from "../ast/types"
 import { Renamer, generateName } from "./rename"
 import { StringEncryptor } from "./strings"
 import { CodeGenerator } from "./codegen"
+import { Compiler } from "../compiler/compiler"
+import { generateVM } from "../vm/generator"
 
 export interface ObfuscateOptions {
   rename: boolean
   encodeStrings: boolean
   minify: boolean
+  vmType: "none" | "register"
+  vmLevel: "normal" | "max" | "debug"
   seed?: number
 }
 
@@ -20,7 +24,12 @@ export function obfuscate(ast: AST.Block, opts: ObfuscateOptions): string {
     tree = renamer.rename(tree)
   }
 
-  
+  if (opts.vmType !== "none") {
+    const compiler = new Compiler()
+    const proto = compiler.compile(tree)
+    return generateVM(proto, { seed, minify: opts.minify })
+  }
+
   let decryptorCode = ""
   if (opts.encodeStrings) {
     const tableVar = generateName(999, seed ^ 0xDEAD)
@@ -30,15 +39,12 @@ export function obfuscate(ast: AST.Block, opts: ObfuscateOptions): string {
     decryptorCode = encryptor.generateDecryptorCode()
   }
 
-  
   const codegen = new CodeGenerator({ minify: opts.minify })
   const mainCode = codegen.generate(tree)
 
-  
   const parts: string[] = []
   if (decryptorCode) parts.push(decryptorCode)
   parts.push(mainCode)
 
   return parts.join("\n")
 }
-
