@@ -552,4 +552,3 @@ export function generateVM(rootProto: Proto, cfg: VMGenConfig): string {
 
 export { mulberry32 } from "./utils"
 
-
