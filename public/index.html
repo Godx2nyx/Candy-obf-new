@@ -1,0 +1,937 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>CandyObf — Lua Obfuscator</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg:       #09090F;
+    --surface:  #111120;
+    --border:   #1E1E35;
+    --pink:     #FF6FD8;
+    --purple:   #B06AFF;
+    --blue:     #6A8FFF;
+    --text:     #E8E8F0;
+    --muted:    #6B6B88;
+    --glow-p:   rgba(255,111,216,0.35);
+    --glow-v:   rgba(176,106,255,0.35);
+  }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Inter', sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* ── Background grid ── */
+  body::before {
+    content: '';
+    position: fixed; inset: 0;
+    background-image:
+      linear-gradient(rgba(176,106,255,0.04) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(176,106,255,0.04) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  /* ── Ambient orbs ── */
+  .orb {
+    position: fixed;
+    border-radius: 50%;
+    filter: blur(100px);
+    pointer-events: none;
+    z-index: 0;
+    opacity: 0.18;
+    animation: drift 12s ease-in-out infinite alternate;
+  }
+  .orb-1 { width: 600px; height: 600px; background: var(--purple); top: -200px; left: -150px; }
+  .orb-2 { width: 500px; height: 500px; background: var(--pink);   bottom: -150px; right: -100px; animation-delay: -6s; }
+  .orb-3 { width: 300px; height: 300px; background: var(--blue);   top: 40%; left: 40%; animation-delay: -3s; opacity: 0.1; }
+
+  @keyframes drift {
+    from { transform: translate(0,0) scale(1); }
+    to   { transform: translate(30px, 20px) scale(1.05); }
+  }
+
+  /* ── Navbar ── */
+  nav {
+    position: fixed; top: 0; left: 0; right: 0;
+    z-index: 100;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0 2rem;
+    height: 60px;
+    background: rgba(9,9,15,0.7);
+    backdrop-filter: blur(20px);
+    border-bottom: 1px solid var(--border);
+  }
+
+  .nav-logo {
+    font-family: 'Space Grotesk', sans-serif;
+    font-weight: 700;
+    font-size: 1.2rem;
+    background: linear-gradient(135deg, var(--pink), var(--purple));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    letter-spacing: -0.02em;
+  }
+
+  .nav-badge {
+    font-size: 0.6rem;
+    font-family: 'JetBrains Mono', monospace;
+    background: linear-gradient(135deg, var(--pink), var(--purple));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    font-weight: 500;
+    margin-left: 0.4rem;
+    vertical-align: super;
+  }
+
+  .nav-links { display: flex; gap: 1.5rem; align-items: center; }
+  .nav-links a {
+    color: var(--muted);
+    text-decoration: none;
+    font-size: 0.85rem;
+    font-weight: 500;
+    transition: color 0.2s;
+  }
+  .nav-links a:hover { color: var(--text); }
+
+  /* ── Hero ── */
+  .hero {
+    position: relative; z-index: 1;
+    min-height: 100vh;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    padding: 80px 2rem 2rem;
+    text-align: center;
+  }
+
+  .hero-eyebrow {
+    display: inline-flex; align-items: center; gap: 0.5rem;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.72rem;
+    color: var(--pink);
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    padding: 0.35rem 0.9rem;
+    border: 1px solid rgba(255,111,216,0.3);
+    border-radius: 99px;
+    margin-bottom: 2rem;
+    background: rgba(255,111,216,0.06);
+  }
+
+  .hero-eyebrow::before {
+    content: '';
+    width: 6px; height: 6px;
+    background: var(--pink);
+    border-radius: 50%;
+    animation: pulse 2s ease infinite;
+  }
+
+  @keyframes pulse {
+    0%,100% { opacity: 1; transform: scale(1); }
+    50%      { opacity: 0.4; transform: scale(0.7); }
+  }
+
+  .hero h1 {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: clamp(3rem, 8vw, 6rem);
+    font-weight: 700;
+    line-height: 1.0;
+    letter-spacing: -0.04em;
+    margin-bottom: 1.5rem;
+  }
+
+  .hero h1 .grad {
+    background: linear-gradient(135deg, var(--pink) 0%, var(--purple) 50%, var(--blue) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .hero p {
+    max-width: 480px;
+    color: var(--muted);
+    font-size: 1.05rem;
+    line-height: 1.7;
+    margin-bottom: 2.5rem;
+  }
+
+  .hero-cta {
+    display: flex; gap: 1rem; flex-wrap: wrap; justify-content: center;
+    margin-bottom: 4rem;
+  }
+
+  .btn-primary {
+    display: inline-flex; align-items: center; gap: 0.5rem;
+    padding: 0.75rem 1.75rem;
+    background: linear-gradient(135deg, var(--pink), var(--purple));
+    color: #fff;
+    font-family: 'Space Grotesk', sans-serif;
+    font-weight: 600;
+    font-size: 0.95rem;
+    border: none; border-radius: 10px;
+    cursor: pointer;
+    text-decoration: none;
+    transition: opacity 0.2s, transform 0.15s, box-shadow 0.2s;
+    box-shadow: 0 0 24px rgba(176,106,255,0.4);
+  }
+  .btn-primary:hover { opacity: 0.9; transform: translateY(-1px); box-shadow: 0 0 36px rgba(176,106,255,0.55); }
+
+  .btn-ghost {
+    display: inline-flex; align-items: center; gap: 0.5rem;
+    padding: 0.75rem 1.75rem;
+    background: transparent;
+    color: var(--text);
+    font-family: 'Space Grotesk', sans-serif;
+    font-weight: 600;
+    font-size: 0.95rem;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    cursor: pointer;
+    text-decoration: none;
+    transition: border-color 0.2s, background 0.2s;
+  }
+  .btn-ghost:hover { border-color: var(--purple); background: rgba(176,106,255,0.07); }
+
+  /* ── Stats bar ── */
+  .stats {
+    display: flex; gap: 3rem; flex-wrap: wrap; justify-content: center;
+  }
+  .stat { text-align: center; }
+  .stat-num {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 1.6rem;
+    font-weight: 700;
+    background: linear-gradient(135deg, var(--pink), var(--purple));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+  .stat-label { font-size: 0.78rem; color: var(--muted); margin-top: 0.2rem; }
+
+  /* ── Editor section ── */
+  .editor-section {
+    position: relative; z-index: 1;
+    padding: 0 2rem 6rem;
+    max-width: 1200px;
+    margin: 0 auto;
+  }
+
+  .editor-section h2 {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 1.8rem;
+    font-weight: 700;
+    text-align: center;
+    margin-bottom: 0.5rem;
+    letter-spacing: -0.02em;
+  }
+
+  .editor-section .sub {
+    text-align: center;
+    color: var(--muted);
+    margin-bottom: 2.5rem;
+    font-size: 0.9rem;
+  }
+
+  /* Options bar */
+  .options-bar {
+    display: flex; gap: 1rem; flex-wrap: wrap; align-items: center;
+    margin-bottom: 1.25rem;
+    padding: 1rem 1.25rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+  }
+
+  .opt-label {
+    font-size: 0.75rem;
+    font-family: 'JetBrains Mono', monospace;
+    color: var(--muted);
+    margin-right: 0.25rem;
+  }
+
+  .toggle-group { display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center; }
+
+  .toggle {
+    display: flex; align-items: center; gap: 0.4rem;
+    font-size: 0.8rem;
+    color: var(--muted);
+    cursor: pointer;
+    user-select: none;
+    padding: 0.3rem 0.7rem;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    transition: all 0.15s;
+    background: transparent;
+    font-family: 'Inter', sans-serif;
+  }
+  .toggle:hover { border-color: var(--purple); color: var(--text); }
+  .toggle.on {
+    background: rgba(176,106,255,0.12);
+    border-color: var(--purple);
+    color: var(--purple);
+  }
+  .toggle .dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--border);
+    transition: background 0.15s;
+  }
+  .toggle.on .dot { background: var(--purple); }
+
+  .sep { width: 1px; height: 24px; background: var(--border); }
+
+  .select-styled {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-size: 0.8rem;
+    padding: 0.3rem 0.6rem;
+    border-radius: 6px;
+    font-family: 'Inter', sans-serif;
+    cursor: pointer;
+    outline: none;
+    transition: border-color 0.15s;
+  }
+  .select-styled:hover, .select-styled:focus { border-color: var(--purple); }
+  .select-styled option { background: #1a1a2e; }
+
+  /* Editor grid */
+  .editor-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+  }
+
+  .editor-pane {
+    display: flex; flex-direction: column;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    overflow: hidden;
+    transition: border-color 0.3s, box-shadow 0.3s;
+    position: relative;
+  }
+
+  .editor-pane.active-glow {
+    border-color: rgba(176,106,255,0.5);
+    box-shadow: 0 0 0 1px rgba(176,106,255,0.15), 0 0 40px rgba(176,106,255,0.12);
+  }
+
+  .pane-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0.65rem 1rem;
+    border-bottom: 1px solid var(--border);
+    background: rgba(0,0,0,0.2);
+  }
+
+  .pane-title {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.72rem;
+    color: var(--muted);
+    display: flex; align-items: center; gap: 0.5rem;
+  }
+
+  .pane-dot { width: 8px; height: 8px; border-radius: 50%; }
+  .dot-pink   { background: var(--pink); }
+  .dot-purple { background: var(--purple); }
+
+  .pane-actions { display: flex; gap: 0.5rem; }
+  .pane-btn {
+    font-size: 0.7rem;
+    padding: 0.2rem 0.55rem;
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    background: transparent;
+    color: var(--muted);
+    cursor: pointer;
+    font-family: 'Inter', sans-serif;
+    transition: all 0.15s;
+  }
+  .pane-btn:hover { border-color: var(--purple); color: var(--purple); }
+
+  textarea, .output-area {
+    flex: 1;
+    min-height: 380px;
+    background: transparent;
+    border: none;
+    outline: none;
+    resize: none;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.82rem;
+    line-height: 1.7;
+    color: var(--text);
+    padding: 1rem 1.25rem;
+    tab-size: 2;
+  }
+
+  textarea::placeholder { color: var(--muted); }
+  textarea:focus { outline: none; }
+
+  .output-area {
+    white-space: pre-wrap;
+    word-break: break-all;
+    overflow: auto;
+    color: rgba(176,106,255,0.9);
+    cursor: default;
+  }
+
+  /* Obfuscate button */
+  .obf-row {
+    display: flex; justify-content: center; align-items: center; gap: 1rem;
+    margin-top: 1.25rem;
+  }
+
+  .btn-obf {
+    position: relative;
+    display: inline-flex; align-items: center; gap: 0.6rem;
+    padding: 0.85rem 2.5rem;
+    background: linear-gradient(135deg, var(--pink), var(--purple), var(--blue));
+    background-size: 200% 200%;
+    color: #fff;
+    font-family: 'Space Grotesk', sans-serif;
+    font-weight: 700;
+    font-size: 1rem;
+    border: none; border-radius: 12px;
+    cursor: pointer;
+    letter-spacing: -0.01em;
+    animation: gradShift 4s ease infinite;
+    box-shadow: 0 0 32px rgba(176,106,255,0.5);
+    transition: transform 0.15s, box-shadow 0.2s;
+    overflow: hidden;
+  }
+
+  .btn-obf::before {
+    content: '';
+    position: absolute; inset: 0;
+    background: rgba(255,255,255,0.1);
+    opacity: 0;
+    transition: opacity 0.15s;
+  }
+  .btn-obf:hover::before { opacity: 1; }
+  .btn-obf:hover { transform: translateY(-2px); box-shadow: 0 0 48px rgba(176,106,255,0.65); }
+  .btn-obf:active { transform: translateY(0); }
+
+  @keyframes gradShift {
+    0%,100% { background-position: 0% 50%; }
+    50%      { background-position: 100% 50%; }
+  }
+
+  .btn-obf .icon { font-size: 1.1rem; }
+
+  /* Spinner */
+  .spinner {
+    display: none;
+    width: 16px; height: 16px;
+    border: 2px solid rgba(255,255,255,0.3);
+    border-top-color: #fff;
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .loading .spinner { display: block; }
+  .loading .btn-icon { display: none; }
+
+  /* Status pill */
+  .status-pill {
+    font-size: 0.75rem;
+    font-family: 'JetBrains Mono', monospace;
+    padding: 0.3rem 0.75rem;
+    border-radius: 99px;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    transition: all 0.3s;
+  }
+  .status-pill.success {
+    border-color: rgba(80,220,120,0.4);
+    color: #50dc78;
+    background: rgba(80,220,120,0.07);
+  }
+  .status-pill.error {
+    border-color: rgba(255,80,80,0.4);
+    color: #ff5050;
+    background: rgba(255,80,80,0.07);
+  }
+
+  /* ── Features ── */
+  .features {
+    position: relative; z-index: 1;
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 0 2rem 6rem;
+  }
+
+  .features h2 {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 2rem;
+    font-weight: 700;
+    text-align: center;
+    margin-bottom: 0.5rem;
+    letter-spacing: -0.03em;
+  }
+  .features .sub { text-align: center; color: var(--muted); margin-bottom: 3rem; font-size: 0.9rem; }
+
+  .feat-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1rem;
+  }
+
+  .feat-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 1.5rem;
+    transition: border-color 0.25s, transform 0.2s, box-shadow 0.25s;
+  }
+  .feat-card:hover {
+    border-color: rgba(176,106,255,0.4);
+    transform: translateY(-3px);
+    box-shadow: 0 12px 40px rgba(176,106,255,0.1);
+  }
+
+  .feat-icon {
+    font-size: 1.6rem;
+    margin-bottom: 1rem;
+    display: block;
+  }
+
+  .feat-card h3 {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 0.95rem;
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+  }
+
+  .feat-card p {
+    font-size: 0.82rem;
+    color: var(--muted);
+    line-height: 1.65;
+  }
+
+  /* ── Footer ── */
+  footer {
+    position: relative; z-index: 1;
+    border-top: 1px solid var(--border);
+    padding: 2rem;
+    display: flex; align-items: center; justify-content: space-between;
+    flex-wrap: wrap; gap: 1rem;
+  }
+
+  .footer-logo {
+    font-family: 'Space Grotesk', sans-serif;
+    font-weight: 700;
+    font-size: 1rem;
+    background: linear-gradient(135deg, var(--pink), var(--purple));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  footer p {
+    font-size: 0.78rem;
+    color: var(--muted);
+  }
+
+  /* ── Particles ── */
+  #particles { position: fixed; inset: 0; pointer-events: none; z-index: 200; }
+
+  .particle {
+    position: absolute;
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    pointer-events: none;
+    animation: particleAnim 0.8s ease-out forwards;
+  }
+
+  @keyframes particleAnim {
+    0%   { opacity: 1; transform: scale(1) translate(0,0); }
+    100% { opacity: 0; transform: scale(0) translate(var(--dx), var(--dy)); }
+  }
+
+  /* ── Toast ── */
+  .toast {
+    position: fixed; bottom: 2rem; right: 2rem;
+    z-index: 300;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.78rem;
+    padding: 0.6rem 1rem;
+    background: var(--surface);
+    border: 1px solid var(--purple);
+    border-radius: 8px;
+    color: var(--purple);
+    transform: translateY(80px);
+    opacity: 0;
+    transition: all 0.3s cubic-bezier(0.34,1.56,0.64,1);
+  }
+  .toast.show { transform: translateY(0); opacity: 1; }
+
+  /* ── Scrollbar ── */
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { background: var(--bg); }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--purple); }
+
+  /* ── Responsive ── */
+  @media (max-width: 768px) {
+    .editor-grid { grid-template-columns: 1fr; }
+    .feat-grid   { grid-template-columns: 1fr; }
+    .stats       { gap: 1.5rem; }
+    .options-bar { gap: 0.6rem; }
+    .sep { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<div class="orb orb-1"></div>
+<div class="orb orb-2"></div>
+<div class="orb orb-3"></div>
+<canvas id="particles"></canvas>
+
+<!-- Navbar -->
+<nav>
+  <span class="nav-logo">CandyObf<span class="nav-badge">v1.0</span></span>
+  <div class="nav-links">
+    <a href="#editor">Obfuscate</a>
+    <a href="#features">Features</a>
+    <a href="https://github.com" target="_blank">GitHub</a>
+    <a href="#editor" class="btn-primary" style="padding:0.4rem 1rem;font-size:0.82rem;">Try Free →</a>
+  </div>
+</nav>
+
+<!-- Hero -->
+<section class="hero">
+  <div class="hero-eyebrow">Lua Obfuscator for Roblox &amp; Beyond</div>
+  <h1>
+    Protect Your<br/>
+    <span class="grad">Lua Scripts</span>
+  </h1>
+  <p>Advanced multi-layer obfuscation with VM bytecode generation, variable renaming, and string encryption. Built to defeat decompilers.</p>
+  <div class="hero-cta">
+    <a href="#editor" class="btn-primary">
+      <span>Start Obfuscating</span>
+      <span>→</span>
+    </a>
+    <a href="#features" class="btn-ghost">View Features</a>
+  </div>
+  <div class="stats">
+    <div class="stat">
+      <div class="stat-num">VM</div>
+      <div class="stat-label">Register-based bytecode</div>
+    </div>
+    <div class="stat">
+      <div class="stat-num">Anti-EMU</div>
+      <div class="stat-label">Emulation detection</div>
+    </div>
+    <div class="stat">
+      <div class="stat-num">AES+</div>
+      <div class="stat-label">String encryption</div>
+    </div>
+    <div class="stat">
+      <div class="stat-num">100%</div>
+      <div class="stat-label">Roblox compatible</div>
+    </div>
+  </div>
+</section>
+
+<!-- Editor -->
+<section class="editor-section" id="editor">
+  <h2>Obfuscation Studio</h2>
+  <p class="sub">Paste your Lua code, choose options, hit the button.</p>
+
+  <!-- Options -->
+  <div class="options-bar">
+    <span class="opt-label">OPTIONS</span>
+    <div class="toggle-group">
+      <button class="toggle on" id="tog-rename" onclick="toggleOpt(this)">
+        <span class="dot"></span> Rename Variables
+      </button>
+      <button class="toggle on" id="tog-strings" onclick="toggleOpt(this)">
+        <span class="dot"></span> Encrypt Strings
+      </button>
+      <button class="toggle" id="tog-minify" onclick="toggleOpt(this)">
+        <span class="dot"></span> Minify
+      </button>
+    </div>
+    <div class="sep"></div>
+    <span class="opt-label">VM</span>
+    <select class="select-styled" id="sel-vmtype">
+      <option value="register">Register VM</option>
+      <option value="none">No VM</option>
+    </select>
+    <select class="select-styled" id="sel-vmlevel">
+      <option value="max">Max Protection</option>
+      <option value="normal">Normal</option>
+      <option value="debug">Debug</option>
+    </select>
+  </div>
+
+  <!-- Editors -->
+  <div class="editor-grid">
+    <div class="editor-pane" id="pane-in">
+      <div class="pane-header">
+        <div class="pane-title">
+          <span class="pane-dot dot-pink"></span>
+          input.lua
+        </div>
+        <div class="pane-actions">
+          <button class="pane-btn" onclick="loadSample()">Sample</button>
+          <button class="pane-btn" onclick="clearInput()">Clear</button>
+        </div>
+      </div>
+      <textarea id="input-code" placeholder="-- Paste your Lua code here...&#10;&#10;local function greet(name)&#10;  print(&quot;Hello, &quot; .. name)&#10;end&#10;&#10;greet(&quot;World&quot;)" spellcheck="false"></textarea>
+    </div>
+
+    <div class="editor-pane" id="pane-out">
+      <div class="pane-header">
+        <div class="pane-title">
+          <span class="pane-dot dot-purple"></span>
+          output.lua
+        </div>
+        <div class="pane-actions">
+          <button class="pane-btn" onclick="copyOutput()">Copy</button>
+          <button class="pane-btn" onclick="downloadOutput()">Download</button>
+        </div>
+      </div>
+      <div class="output-area" id="output-code">-- Obfuscated output will appear here...</div>
+    </div>
+  </div>
+
+  <!-- Action row -->
+  <div class="obf-row">
+    <button class="btn-obf" id="obf-btn" onclick="doObfuscate()">
+      <span class="btn-icon icon">🍬</span>
+      <span class="spinner"></span>
+      <span>Obfuscate</span>
+    </button>
+    <div class="status-pill" id="status-pill">ready</div>
+  </div>
+</section>
+
+<!-- Features -->
+<section class="features" id="features">
+  <h2>Why CandyObf?</h2>
+  <p class="sub">Every layer adds a new barrier against reverse engineering.</p>
+  <div class="feat-grid">
+    <div class="feat-card">
+      <span class="feat-icon">🖥️</span>
+      <h3>Register-Based VM</h3>
+      <p>Compiles your Lua to custom bytecode that runs inside a per-build virtual machine. Every build is different.</p>
+    </div>
+    <div class="feat-card">
+      <span class="feat-icon">🔀</span>
+      <h3>Opcode Permutation</h3>
+      <p>Opcodes are randomly shuffled each build. Emulator signatures become useless instantly.</p>
+    </div>
+    <div class="feat-card">
+      <span class="feat-icon">🔐</span>
+      <h3>String Encryption</h3>
+      <p>All string literals are XOR-encrypted with rolling keys and decoded lazily at runtime.</p>
+    </div>
+    <div class="feat-card">
+      <span class="feat-icon">🎭</span>
+      <h3>Variable Renaming</h3>
+      <p>Local and global names are replaced with pseudo-random identifiers seeded per-build.</p>
+    </div>
+    <div class="feat-card">
+      <span class="feat-icon">🛡️</span>
+      <h3>Anti-Emulation</h3>
+      <p>Fibonacci checks, math consistency tests, metatable probes, and coroutine traps crash emulators.</p>
+    </div>
+    <div class="feat-card">
+      <span class="feat-icon">🍭</span>
+      <h3>Roblox Ready</h3>
+      <p>Output runs cleanly in Roblox Luau. No external dependencies, no require() chains.</p>
+    </div>
+  </div>
+</section>
+
+<!-- Footer -->
+<footer>
+  <span class="footer-logo">CandyObf</span>
+  <p>Built with 💜 for the Lua community</p>
+  <p style="color:var(--muted);font-size:0.72rem;">© 2025 CandyObf. All rights reserved.</p>
+</footer>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<script>
+  // ── Toggle options ──
+  function toggleOpt(el) {
+    el.classList.toggle('on')
+  }
+
+  function getOpts() {
+    return {
+      rename:        document.getElementById('tog-rename').classList.contains('on'),
+      encodeStrings: document.getElementById('tog-strings').classList.contains('on'),
+      minify:        document.getElementById('tog-minify').classList.contains('on'),
+      vmType:        document.getElementById('sel-vmtype').value,
+      vmLevel:       document.getElementById('sel-vmlevel').value,
+    }
+  }
+
+  // ── Sample code ──
+  function loadSample() {
+    document.getElementById('input-code').value =
+`-- CandyObf sample script
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+
+local SECRET_KEY = "candy_obf_2025"
+local MAX_PLAYERS = 100
+
+local function hashString(s, key)
+  local result = ""
+  for i = 1, #s do
+    local c = string.byte(s, i)
+    local k = string.byte(key, (i % #key) + 1)
+    result = result .. string.char(bit32.bxor(c, k))
+  end
+  return result
+end
+
+local function onPlayerJoin(player)
+  local token = hashString(player.Name, SECRET_KEY)
+  print("Player joined:", player.Name, "Token:", token)
+end
+
+Players.PlayerAdded:Connect(onPlayerJoin)
+print("Script loaded — protected by CandyObf")`
+  }
+
+  function clearInput() {
+    document.getElementById('input-code').value = ''
+    document.getElementById('output-code').textContent = '-- Obfuscated output will appear here...'
+    setStatus('ready', '')
+  }
+
+  // ── Obfuscate ──
+  async function doObfuscate() {
+    const code = document.getElementById('input-code').value.trim()
+    if (!code) { showToast('Paste some Lua code first'); return }
+
+    const btn = document.getElementById('obf-btn')
+    btn.classList.add('loading')
+    btn.disabled = true
+    setStatus('', '...')
+
+    // Simulate API call (replace with real fetch to /api/obfuscate)
+    await new Promise(r => setTimeout(r, 900 + Math.random() * 600))
+
+    // Mock output (in production, call your server)
+    const opts = getOpts()
+    const mockOutput = generateMockObf(code, opts)
+
+    document.getElementById('output-code').textContent = mockOutput
+    btn.classList.remove('loading')
+    btn.disabled = false
+    setStatus('success', 'obfuscated')
+    burstParticles()
+    document.getElementById('pane-out').classList.add('active-glow')
+    setTimeout(() => document.getElementById('pane-out').classList.remove('active-glow'), 2000)
+  }
+
+  function generateMockObf(code, opts) {
+    // Mock — replace with real API call
+    const names = ['xKpQr','bVmLn','cWjTz','dNhFy','ePsAk','fRuBo','gMiXw','hOlCv']
+    let i = 0
+    const n = () => names[i++ % names.length] + Math.floor(Math.random()*999)
+
+    const lines = [
+      `-- CandyObf | Protected output`,
+      `-- VM: ${opts.vmType} | Level: ${opts.vmLevel}`,
+      `local ${n()},${n()},${n()}=table.unpack,math.floor,string.char`,
+      `local ${n()}={${Array.from({length:8},()=>Math.floor(Math.random()*255)).join(',')}}`,
+      `local function ${n()}(${n()},${n()})`,
+      `  local ${n()}=${n()}*0x${Math.floor(Math.random()*0xFFFF).toString(16)}`,
+      `  return ${n()}~${n()}`,
+      `end`,
+      `-- [[ ${code.split('\n').length} lines → ${Math.floor(Math.random()*4000+2000)} bytes ]]`,
+    ]
+    return lines.join('\n')
+  }
+
+  // ── Copy / Download ──
+  function copyOutput() {
+    const out = document.getElementById('output-code').textContent
+    if (out.startsWith('--') && out.includes('appear here')) { showToast('Nothing to copy'); return }
+    navigator.clipboard.writeText(out).then(() => showToast('Copied!'))
+  }
+
+  function downloadOutput() {
+    const out = document.getElementById('output-code').textContent
+    if (out.includes('appear here')) { showToast('Nothing to download'); return }
+    const a = document.createElement('a')
+    a.href = URL.createObjectURL(new Blob([out], {type:'text/plain'}))
+    a.download = 'obfuscated.lua'
+    a.click()
+  }
+
+  // ── Status ──
+  function setStatus(cls, text) {
+    const el = document.getElementById('status-pill')
+    el.className = 'status-pill' + (cls ? ' ' + cls : '')
+    el.textContent = text || 'ready'
+  }
+
+  // ── Toast ──
+  function showToast(msg) {
+    const t = document.getElementById('toast')
+    t.textContent = msg
+    t.classList.add('show')
+    setTimeout(() => t.classList.remove('show'), 2200)
+  }
+
+  // ── Particle burst ──
+  function burstParticles() {
+    const canvas = document.getElementById('particles')
+    const btn = document.getElementById('obf-btn')
+    const rect = btn.getBoundingClientRect()
+    const cx = rect.left + rect.width / 2
+    const cy = rect.top + rect.height / 2
+    const colors = ['#FF6FD8','#B06AFF','#6A8FFF','#ffffff','#ff99ee']
+
+    for (let i = 0; i < 28; i++) {
+      const p = document.createElement('div')
+      p.className = 'particle'
+      const angle = (Math.PI * 2 / 28) * i + (Math.random() - 0.5) * 0.5
+      const dist = 50 + Math.random() * 80
+      p.style.cssText = `
+        left:${cx - 3}px; top:${cy - 3}px;
+        background:${colors[Math.floor(Math.random()*colors.length)]};
+        --dx:${Math.cos(angle)*dist}px;
+        --dy:${Math.sin(angle)*dist}px;
+        animation-duration:${0.6 + Math.random()*0.4}s;
+        animation-delay:${Math.random()*0.1}s;
+      `
+      document.body.appendChild(p)
+      setTimeout(() => p.remove(), 1200)
+    }
+  }
+
+  // ── Input glow on focus ──
+  document.getElementById('input-code').addEventListener('focus', () => {
+    document.getElementById('pane-in').classList.add('active-glow')
+  })
+  document.getElementById('input-code').addEventListener('blur', () => {
+    document.getElementById('pane-in').classList.remove('active-glow')
+  })
+</script>
+</body>
+</html>
+
