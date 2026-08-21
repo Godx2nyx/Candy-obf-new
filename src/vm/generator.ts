@@ -1,5 +1,5 @@
 import { Proto, Op, Constant } from "../compiler/bytecode"
-import { mulberry32, randomNames, base85Encode, buildOpcodePermutation, arxMix, fnvHash, keySchedule, seededShuffle } from "./utils"
+import { mulberry32, randomNames, base85Encode, buildOpcodePermutation, arxMix, fnvHash, seededShuffle } from "./utils"
 
 // ====== CONFIG ======
 export interface VMGenConfig {
@@ -20,16 +20,27 @@ function buildPermTable(seed: number): { perm: number[]; inv: number[] } {
 // ====== ENCRYPT BYTECODE ======
 // ARX + XOR + stateful rolling hash
 function encryptBytecode(data: number[], seed: number): { blob: number[]; key: number; checksum: number } {
-  const ks = keySchedule(seed, data.length)
+  // Keep the key schedule identical to the generated Luau decoder.
+  // Using the same LCG here avoids the previous TS/runtime key-schedule mismatch.
   const blob: number[] = []
   let rolling = seed & 0xFF
+  let state = seed >>> 0
   for (let i = 0; i < data.length; i++) {
-    const k = (ks[i] ^ rolling ^ (i & 0xFF)) & 0xFF
+    state = (Math.imul(state, 1664525) + 1013904223) >>> 0
+    const ks = state & 0xFF
+    const k = (ks ^ rolling ^ (i & 0xFF)) & 0xFF
     const enc = (data[i] ^ k) & 0xFF
     blob.push(enc)
     rolling = (rolling + data[i] + i) & 0xFF
   }
-  const checksum = fnvHash(data, seed ^ 0xCAFEBABE)
+  // Match the generated Luau checksum exactly:
+  // FNV-style update from 0x811C9DC5, then XOR the per-build salt.
+  let checksum = 0x811C9DC5 >>> 0
+  for (const b of data) {
+    checksum = Math.imul(checksum, 0x01000193) >>> 0
+    checksum = (checksum ^ b) >>> 0
+  }
+  checksum = (checksum ^ ((seed ^ 0xCAFEBABE) >>> 0)) >>> 0
   return { blob, key: seed & 0xFF, checksum }
 }
 
@@ -162,6 +173,7 @@ export function generateVM(rootProto: Proto, cfg: VMGenConfig): string {
 
   const out: string[] = []
   const L = (...lines: string[]) => lines.forEach(l => out.push(l))
+  L(`-- zisuay Team`)
 
   // ====== ANTI-EMU GUARD ======
   L(`local ${nGuard}=true`)
@@ -187,9 +199,9 @@ export function generateVM(rootProto: Proto, cfg: VMGenConfig): string {
 
   // Upvalue chain
   L(`local ${nUvR}=${uvSeed}`)
-  L(`local ${nUvC}=${uvA};${nUvR}=(function() return ${nUvR}~${nUvC} end)()`)
-  L(`${nUvC}=${uvB};${nUvR}=(function() return ${nUvR}~${nUvC} end)()`)
-  L(`${nUvC}=${uvC};${nUvR}=(function() return ${nUvR}~${nUvC} end)()`)
+  L(`local ${nUvC}=${uvA};${nUvR}=(function() return bit32.bxor(${nUvR},${nUvC}) end)()`)
+  L(`${nUvC}=${uvB};${nUvR}=(function() return bit32.bxor(${nUvR},${nUvC}) end)()`)
+  L(`${nUvC}=${uvC};${nUvR}=(function() return bit32.bxor(${nUvR},${nUvC}) end)()`)
   L(`if ${nUvR}~=${uvExp} then ${nGuard}=false end`)
 
   // Coroutine state (EMU ใช้ safe_coroutine ที่ต่างกัน)
@@ -273,17 +285,17 @@ export function generateVM(rootProto: Proto, cfg: VMGenConfig): string {
   const nRolling2 = N()
   L(`local ${nRolling2}=${cfg.seed & 0xFF}`)
   L(`for i=1,#${nPayload} do`)
-  L(`  local k=(${nKs}[i]~${nRolling2}~((i-1)%256))%256`)
-  L(`  ${nRaw}[i]=${nPayload}[i]~k`)
+  L(`  local k=bit32.bxor(bit32.bxor(${nKs}[i],${nRolling2}),(i-1)%256)`)
+  L(`  ${nRaw}[i]=bit32.bxor(${nPayload}[i],k)`)
   L(`  ${nRolling2}=(${nRolling2}+${nRaw}[i]+i)%256`)
   L(`end`)
 
   // Checksum verify (integrity check)
   L(`local ${nChkVar}=2166136261`)
   L(`for _,${nV} in ipairs(${nRaw}) do`)
-  L(`  ${nChkVar}=(${nChkVar}*16777619~${nV})%4294967296`)
+  L(`  ${nChkVar}=bit32.bxor((${nChkVar}*16777619)%4294967296,${nV})`)
   L(`end`)
-  L(`${nChkVar}=(${nChkVar}~(${cfg.seed ^ 0xCAFEBABE}>>>0))%4294967296`)
+  L(`${nChkVar}=bit32.bxor(${nChkVar},${((cfg.seed ^ 0xCAFEBABE) >>> 0)})%4294967296`)
   L(`if ${nChkVar}~=${checksum >>> 0} then error("",0) end`)
 
   // ====== BYTECODE DESERIALIZER ======
@@ -317,7 +329,7 @@ export function generateVM(rootProto: Proto, cfg: VMGenConfig): string {
   // opcode inverse permutation embedded as table
   const invPerm = inv.slice(0, Op._COUNT)
   L(`    local invP={${invPerm.join(',')}}`)
-  L(`    p.instrs[i]={op=invP[op+1] or op,a=${nU8}(),b=${nU8}(),c=${nU8}()}`)
+  L(`    local a=${nU8}();local b=${nU8}();local c=${nU8}();local bx=b*256+c;local sbx=bx-32768;p.instrs[i]={op=invP[op+1] or op,a=a,b=b,c=c,bx=bx,sbx=sbx}`)
   L(`  end`)
   L(`  local nk=${nU16}();p.consts={}`)
   L(`  for i=1,nk do`)
@@ -405,15 +417,15 @@ export function generateVM(rootProto: Proto, cfg: VMGenConfig): string {
   // IDIV
   L(`  ${nDisp}[${Op.IDIV}]=function(ins) ${nRegs}[ins.a]=math.floor(${nRegs}[ins.b]/${nRegs}[ins.c]) end`)
   // BAND
-  L(`  ${nDisp}[${Op.BAND}]=function(ins) ${nRegs}[ins.a]=bit32 and bit32.band(${nRegs}[ins.b],${nRegs}[ins.c]) or ${nRegs}[ins.b]&${nRegs}[ins.c] end`)
+  L(`  ${nDisp}[${Op.BAND}]=function(ins) ${nRegs}[ins.a]=bit32.band(${nRegs}[ins.b],${nRegs}[ins.c]) end`)
   // BOR
-  L(`  ${nDisp}[${Op.BOR}]=function(ins) ${nRegs}[ins.a]=bit32 and bit32.bor(${nRegs}[ins.b],${nRegs}[ins.c]) or ${nRegs}[ins.b]|${nRegs}[ins.c] end`)
+  L(`  ${nDisp}[${Op.BOR}]=function(ins) ${nRegs}[ins.a]=bit32.bor(${nRegs}[ins.b],${nRegs}[ins.c]) end`)
   // BXOR
-  L(`  ${nDisp}[${Op.BXOR}]=function(ins) ${nRegs}[ins.a]=bit32 and bit32.bxor(${nRegs}[ins.b],${nRegs}[ins.c]) or ${nRegs}[ins.b]~${nRegs}[ins.c] end`)
+  L(`  ${nDisp}[${Op.BXOR}]=function(ins) ${nRegs}[ins.a]=bit32.bxor(${nRegs}[ins.b],${nRegs}[ins.c]) end`)
   // SHL
-  L(`  ${nDisp}[${Op.SHL}]=function(ins) ${nRegs}[ins.a]=bit32 and bit32.lshift(${nRegs}[ins.b],${nRegs}[ins.c]) or ${nRegs}[ins.b]<<${nRegs}[ins.c] end`)
+  L(`  ${nDisp}[${Op.SHL}]=function(ins) ${nRegs}[ins.a]=bit32.lshift(${nRegs}[ins.b],${nRegs}[ins.c]) end`)
   // SHR
-  L(`  ${nDisp}[${Op.SHR}]=function(ins) ${nRegs}[ins.a]=bit32 and bit32.rshift(${nRegs}[ins.b],${nRegs}[ins.c]) or ${nRegs}[ins.b]>>${nRegs}[ins.c] end`)
+  L(`  ${nDisp}[${Op.SHR}]=function(ins) ${nRegs}[ins.a]=bit32.rshift(${nRegs}[ins.b],${nRegs}[ins.c]) end`)
   // CONCAT
   L(`  ${nDisp}[${Op.CONCAT}]=function(ins) local s="";for i=${nRegs}[ins.b],${nRegs}[ins.c] do s=s..tostring(${nRegs}[i]) end;${nRegs}[ins.a]=s end`)
   // UNM
@@ -423,7 +435,7 @@ export function generateVM(rootProto: Proto, cfg: VMGenConfig): string {
   // LEN
   L(`  ${nDisp}[${Op.LEN}]=function(ins) ${nRegs}[ins.a]=#${nRegs}[ins.b] end`)
   // BNOT
-  L(`  ${nDisp}[${Op.BNOT}]=function(ins) ${nRegs}[ins.a]=bit32 and bit32.bnot(${nRegs}[ins.b]) or ~${nRegs}[ins.b] end`)
+  L(`  ${nDisp}[${Op.BNOT}]=function(ins) ${nRegs}[ins.a]=bit32.bnot(${nRegs}[ins.b]) end`)
   // EQ
   L(`  ${nDisp}[${Op.EQ}]=function(ins) ${nRegs}[ins.a]=${nRegs}[ins.b]==${nRegs}[ins.c] end`)
   // NE
