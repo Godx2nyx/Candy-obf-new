@@ -19,8 +19,8 @@ interface LoopInfo {
 
 class FuncCompiler {
   proto: Proto
-  private locals: Local[] = []
-  private regTop: number = 0
+  locals: Local[] = []
+  regTop: number = 0
   private scopeStack: number[] = []
   private loopStack: LoopInfo[] = []
   private parent: FuncCompiler | null
@@ -40,7 +40,6 @@ class FuncCompiler {
     if (this.regTop > this.proto.maxStack) this.proto.maxStack = this.regTop
   }
 
-  
   allocReg(): number {
     const r = this.regTop++
     if (this.regTop > this.proto.maxStack) this.proto.maxStack = this.regTop
@@ -141,7 +140,6 @@ class FuncCompiler {
     return -1
   }
 
-  
   pushLoop(type: LoopInfo["type"]): LoopInfo {
     const info: LoopInfo = { breakPatches: [], continuePatches: [], type }
     this.loopStack.push(info)
@@ -149,6 +147,7 @@ class FuncCompiler {
   }
 
   popLoop(): LoopInfo { return this.loopStack.pop()! }
+
   currentLoop(): LoopInfo | null {
     return this.loopStack.length > 0 ? this.loopStack[this.loopStack.length - 1] : null
   }
@@ -176,20 +175,20 @@ export class Compiler {
 
   private compileStmt(stmt: AST.Statement, fc: FuncCompiler) {
     switch (stmt.kind) {
-      case "LocalStatement":   this.compileLocal(stmt, fc); break
-      case "LocalFunction":    this.compileLocalFunc(stmt, fc); break
+      case "LocalStatement":      this.compileLocal(stmt, fc); break
+      case "LocalFunction":       this.compileLocalFunc(stmt, fc); break
       case "FunctionDeclaration": this.compileFuncDecl(stmt, fc); break
-      case "AssignStatement":  this.compileAssign(stmt, fc); break
+      case "AssignStatement":     this.compileAssign(stmt, fc); break
       case "ExpressionStatement": this.compileExprStmt(stmt, fc); break
-      case "DoStatement":      this.compileBlock(stmt.body, fc); break
-      case "WhileStatement":   this.compileWhile(stmt, fc); break
-      case "RepeatStatement":  this.compileRepeat(stmt, fc); break
-      case "IfStatement":      this.compileIf(stmt, fc); break
-      case "NumericFor":       this.compileNumFor(stmt, fc); break
-      case "GenericFor":       this.compileGenFor(stmt, fc); break
-      case "ReturnStatement":  this.compileReturn(stmt, fc); break
-      case "BreakStatement":   this.compileBreak(fc); break
-      case "ContinueStatement": this.compileContinue(fc); break
+      case "DoStatement":         this.compileBlock(stmt.body, fc); break
+      case "WhileStatement":      this.compileWhile(stmt, fc); break
+      case "RepeatStatement":     this.compileRepeat(stmt, fc); break
+      case "IfStatement":         this.compileIf(stmt, fc); break
+      case "NumericFor":          this.compileNumFor(stmt, fc); break
+      case "GenericFor":          this.compileGenFor(stmt, fc); break
+      case "ReturnStatement":     this.compileReturn(stmt, fc); break
+      case "BreakStatement":      this.compileBreak(fc); break
+      case "ContinueStatement":   this.compileContinue(fc); break
     }
   }
 
@@ -563,7 +562,6 @@ export class Compiler {
         const r = dst < 0 ? fc.allocReg() : dst
         const callee = this.compileExpr(expr.callee, fc, r)
         if (callee !== r) fc.emitABC(Op.MOVE, r, callee, 0)
-        const argBase = r + 1
         for (let i = 0; i < expr.args.length; i++) {
           const ar = fc.allocReg()
           this.compileExprTo(expr.args[i], fc, ar)
@@ -579,7 +577,6 @@ export class Compiler {
         if (obj !== r) fc.emitABC(Op.MOVE, r, obj, 0)
         const k = fc.addConst(constStr(expr.method.name))
         fc.emitABC(Op.SELF, r, r, k)
-        const argBase = r + 2
         for (let i = 0; i < expr.args.length; i++) {
           const ar = fc.allocReg()
           this.compileExprTo(expr.args[i], fc, ar)
@@ -632,20 +629,8 @@ export class Compiler {
         return dst < 0 ? fc.allocReg() : dst
     }
   }
-
-  private createFuncCompiler(
-    params: AST.Identifier[],
-    hasVarArg: boolean,
-    parent: FuncCompiler
-  ): FuncCompiler {
-    const fc = new FuncCompiler(this.protoCounter++, params.length, hasVarArg, parent, this.protoCounter)
-    for (let i = 0; i < params.length; i++) {
-      fc.locals.push({ name: params[i].name, reg: i, startPc: 0 })
-    }
-    return fc
-  }
 }
 
 export function compile(ast: AST.Block): Proto {
   return new Compiler().compile(ast)
-}
+        }
