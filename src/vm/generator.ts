@@ -268,11 +268,10 @@ export function generateVM(rootProto: Proto, cfg: VMGenConfig): string {
   L(`  end`)
   L(`end`)
   L(`local ${nPayload}=${nDecode}(${nBlob},${nKey})`)
-  L(`local ${nRawBytes}=${nPayload}`.replace(nPayload, N()))
-  const nRaw = names[ni-1] ?? N()
+  const nRaw = N()
   L(`local ${nRaw}={}`)
-  L(`local ${nRolling2}=${cfg.seed & 0xFF}`.replace('${nRolling2}', N()))
-  const nRolling2 = names[ni-1] ?? N()
+  const nRolling2 = N()
+  L(`local ${nRolling2}=${cfg.seed & 0xFF}`)
   L(`for i=1,#${nPayload} do`)
   L(`  local k=(${nKs}[i]~${nRolling2}~((i-1)%256))%256`)
   L(`  ${nRaw}[i]=${nPayload}[i]~k`)
@@ -288,8 +287,8 @@ export function generateVM(rootProto: Proto, cfg: VMGenConfig): string {
   L(`if ${nChkVar}~=${checksum >>> 0} then error("",0) end`)
 
   // ====== BYTECODE DESERIALIZER ======
-  L(`local ${nPos2}=1`.replace('${nPos2}', N()))
-  const nPos2 = names[ni-1] ?? N()
+  const nPos2 = N()
+  L(`local ${nPos2}=1`)
   L(`local function ${nU8}() local v=${nRaw}[${nPos2}] or 0;${nPos2}=${nPos2}+1;return v end`)
   L(`local function ${nU16}() local a=${nU8}();local b=${nU8}();return a+b*256 end`)
   L(`local function ${nU32}() local a=${nU16}();local b=${nU16}();return a+b*65536 end`)
@@ -302,8 +301,7 @@ export function generateVM(rootProto: Proto, cfg: VMGenConfig): string {
   L(`  if exp==2047 then return mant==0 and sign*(1/0) or 0/0 end`)
   L(`  return sign*(1+mant)*2^(exp-1023)`)
   L(`end`)
-  L(`local function ${nStrBuf2}()`.replace('${nStrBuf2}', N()))
-  const nStrBuf2 = names[ni-1] ?? N()
+  const nStrBuf2 = N()
   L(`local function ${nStrBuf2}()`)
   L(`  local len=${nU16}();local s=""`)
   L(`  for i=1,len do s=s..string.char(${nU8}()) end`)
@@ -335,8 +333,8 @@ export function generateVM(rootProto: Proto, cfg: VMGenConfig): string {
   L(`  for i=1,np do ${nU16}();p.protos[i]=${nProto}() end`)
   L(`  return p`)
   L(`end`)
-  L(`local ${nRoot}=${nProto}()`.replace('${nRoot}', N()))
-  const nRoot = names[ni-1] ?? N()
+  const nRoot = N()
+  L(`local ${nRoot}=${nProto}()`)
 
   // ====== VM EXECUTOR ======
   // Handler table (Dispatcher-Based Interpretation + Polymorphic Handlers)
@@ -553,4 +551,5 @@ export function generateVM(rootProto: Proto, cfg: VMGenConfig): string {
 }
 
 export { mulberry32 } from "./utils"
+
 
