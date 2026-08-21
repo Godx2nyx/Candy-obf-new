@@ -604,7 +604,7 @@ export class Compiler {
           if (field.kind === "TableField") {
             const val = fc.allocReg()
             this.compileExprTo(field.value, fc, val)
-            fc.emitABC(Op.LOADINT, val + 1, fc.addConst(constNum(arrIdx++)))
+            fc.emitABx(Op.LOADINT, val + 1, fc.addConst(constNum(arrIdx++)))
             fc.emitABC(Op.SETTABLE, r, val + 1, val)
             fc.freeReg(); fc.freeReg()
           } else if (field.kind === "TableKeyString") {
