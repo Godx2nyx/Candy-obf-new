@@ -1,14 +1,11 @@
 import { Proto, Op, Constant } from "../compiler/bytecode"
 import { mulberry32, randomNames, base85Encode, buildOpcodePermutation, arxMix, fnvHash, seededShuffle } from "./utils"
 
-// ====== CONFIG ======
 export interface VMGenConfig {
   seed: number
   minify: boolean
 }
 
-// ====== OPCODE PERMUTATION ======
-// Per-build: opcode ถูกสลับใหม่ทุก build EMU ต้อง re-analyze ทุกครั้ง
 function buildPermTable(seed: number): { perm: number[]; inv: number[] } {
   const rng = mulberry32(seed ^ 0xDEAD1337)
   const perm = buildOpcodePermutation(Op._COUNT, rng)
@@ -17,11 +14,7 @@ function buildPermTable(seed: number): { perm: number[]; inv: number[] } {
   return { perm, inv }
 }
 
-// ====== ENCRYPT BYTECODE ======
-// ARX + XOR + stateful rolling hash
 function encryptBytecode(data: number[], seed: number): { blob: number[]; key: number; checksum: number } {
-  // Keep the key schedule identical to the generated Luau decoder.
-  // Using the same LCG here avoids the previous TS/runtime key-schedule mismatch.
   const blob: number[] = []
   let rolling = seed & 0xFF
   let state = seed >>> 0
@@ -33,8 +26,6 @@ function encryptBytecode(data: number[], seed: number): { blob: number[]; key: n
     blob.push(enc)
     rolling = (rolling + data[i] + i) & 0xFF
   }
-  // Match the generated Luau checksum exactly:
-  // FNV-style update from 0x811C9DC5, then XOR the per-build salt.
   let checksum = 0x811C9DC5 >>> 0
   for (const b of data) {
     checksum = Math.imul(checksum, 0x01000193) >>> 0
@@ -44,13 +35,10 @@ function encryptBytecode(data: number[], seed: number): { blob: number[]; key: n
   return { blob, key: seed & 0xFF, checksum }
 }
 
-// ====== SERIALIZE PROTO TO BYTES ======
 function serializeProto(proto: Proto, permTable: number[]): number[] {
   const bytes: number[] = []
-
   function writeU8(v: number) { bytes.push(v & 0xFF) }
   function writeU16(v: number) { writeU8(v & 0xFF); writeU8((v >> 8) & 0xFF) }
-  function writeU32(v: number) { writeU16(v & 0xFFFF); writeU16((v >> 16) & 0xFFFF) }
   function writeFloat(v: number) {
     const buf = new ArrayBuffer(8)
     new DataView(buf).setFloat64(0, v, true)
@@ -60,13 +48,9 @@ function serializeProto(proto: Proto, permTable: number[]): number[] {
     writeU16(s.length)
     for (let i = 0; i < s.length; i++) writeU8(s.charCodeAt(i) & 0xFF)
   }
-
-  // Header
   writeU8(proto.params)
   writeU8(proto.hasVarArg ? 1 : 0)
   writeU8(proto.maxStack)
-
-  // Instructions
   writeU16(proto.instructions.length)
   for (const ins of proto.instructions) {
     const permOp = permTable[ins.op] ?? ins.op
@@ -75,57 +59,46 @@ function serializeProto(proto: Proto, permTable: number[]): number[] {
     writeU8(ins.b)
     writeU8(ins.c)
   }
-
-  // Constants
   writeU16(proto.constants.length)
   for (const k of proto.constants) {
-    if (k.type === "nil")     { writeU8(0) }
+    if (k.type === "nil")          { writeU8(0) }
     else if (k.type === "boolean") { writeU8(1); writeU8(k.value ? 1 : 0) }
     else if (k.type === "number")  { writeU8(2); writeFloat(k.value) }
     else if (k.type === "string")  { writeU8(3); writeStr(k.value) }
   }
-
-  // Upvalues
   writeU16(proto.upvalues.length)
   for (const uv of proto.upvalues) {
     writeU8(uv.inStack ? 1 : 0)
     writeU8(uv.idx)
     writeStr(uv.name)
   }
-
-  // Sub-protos
   writeU16(proto.protos.length)
   for (const sub of proto.protos) {
     const subBytes = serializeProto(sub, permTable)
     writeU16(subBytes.length)
     for (const b of subBytes) writeU8(b)
   }
-
   return bytes
 }
 
-// ====== GENERATE VM RUNNER ======
 export function generateVM(rootProto: Proto, cfg: VMGenConfig): string {
   const rng = mulberry32(cfg.seed)
   const names = randomNames(rng, 120, 6)
   let ni = 0
   const N = () => names[ni++] ?? `_v${ni}`
 
-  // opcode permutation
   const { perm, inv } = buildPermTable(cfg.seed)
-
-  // serialize + encrypt
   const rawBytes = serializeProto(rootProto, perm)
   const { blob, key, checksum } = encryptBytecode(rawBytes, cfg.seed)
   const b85 = base85Encode(blob)
 
-  // name pool
+  // ====== NAME POOL ======
   const nBlob    = N(), nKey     = N(), nChk    = N(), nDecode = N()
   const nVm      = N(), nExec    = N(), nEnv    = N(), nUp     = N()
   const nRegs    = N(), nPC      = N(), nStack  = N(), nProto  = N()
   const nConsts  = N(), nInstrs  = N(), nProtos = N(), nUvals  = N()
   const nOp      = N(), nA       = N(), nB      = N(), nC      = N()
-  const nDisp    = N(), nI       = N(), nV      = N(), nR      = N()
+  const nI       = N(), nV      = N(), nR       = N()
   const nGuard   = N(), nRolling = N(), nSum    = N(), nFp     = N()
   const nIdxMap  = N(), nStrBuf  = N(), nPos    = N(), nLen    = N()
   const nU8      = N(), nU16     = N(), nU32    = N(), nFlt    = N()
@@ -141,11 +114,24 @@ export function generateVM(rootProto: Proto, cfg: VMGenConfig): string {
   const nDynApi  = N(), nApiT   = N(), nApiR   = N()
   const nPayload = N(), nStage1 = N(), nStage2 = N()
   const nChunk   = N(), nChunkI = N(), nChunkN = N()
+  const nStrBuf2 = N()
 
-  // per-build opaque constants
+  // ====== MULTI-REGION DISPATCH NAMES ======
+  // 4 region tables — each opcode is assigned to exactly one, per-build
+  const nR1 = N(), nR2 = N(), nR3 = N(), nR4 = N()
+  const nRegArr = N()   // { nR1, nR2, nR3, nR4 }
+  const nRegMap = N()   // opRegMap[op+1] → region index (0-based)
+
+  // Per-build random opcode→region assignment (seeded, changes every build)
+  const NUM_REGIONS = 4
+  const opRegionAssign = Array.from({length: Op._COUNT}, () => Math.floor(rng() * NUM_REGIONS))
+  const regionNames = [nR1, nR2, nR3, nR4]
+  // regionOf(op) returns which Lua variable name holds that opcode's handler table
+  const regionOf = (op: number) => regionNames[opRegionAssign[op]]
+
+  // ====== PER-BUILD CONSTANTS ======
   const opaqueA = 1 + Math.floor(rng() * 65535)
   const opaqueB = 1 + Math.floor(rng() * 65535)
-  const opaqueC = arxMix(opaqueA ^ opaqueB, cfg.seed) & 0xFFFF
   const fibN = 18 + Math.floor(rng() * 10)
   let fa = 1, fb = 1
   for (let i = 2; i < fibN; i++) { [fa, fb] = [fb, fa + fb] }
@@ -163,81 +149,55 @@ export function generateVM(rootProto: Proto, cfg: VMGenConfig): string {
   const dispTblKeys = Array.from({length:8}, () => Math.floor(rng() * 255))
   const dispTblVals = Array.from({length:8}, () => Math.floor(rng() * 255))
   const dispSum = dispTblVals.reduce((a,b)=>(a+b)%16777216,0)
+  const cpExpected = arxMix(cfg.seed, 0x31337) & 0xFFFF
 
-  // Base85 decoder (Lua)
   const b85Chars = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz!#$%&()*+-;<=>?@^_`{|}~'
   const b85MapEntries = Array.from(b85Chars).map((c,i) => `[${c.charCodeAt(0)}]=${i}`).join(',')
 
   const NL = cfg.minify ? ' ' : '\n'
-  const T = cfg.minify ? '' : '  '
-
   const out: string[] = []
   const L = (...lines: string[]) => lines.forEach(l => out.push(l))
+
   L(`-- zisuay Team`)
 
   // ====== ANTI-EMU GUARD ======
   L(`local ${nGuard}=true`)
-
-  // Fibonacci check (EMU clock=0 ไม่กระทบ แต่ต้อง execute จริง)
   L(`local ${nFib1},${nFib2}=1,1`)
   L(`for ${nFibN}=2,${fibN} do local ${nFibT}=${nFib2};${nFib2}=${nFib1}+${nFib2};${nFib1}=${nFibT} end`)
   L(`if ${nFib2}%65536~=${fibExpected} then ${nGuard}=false end`)
-
-  // Math consistency (ต้องใช้ math library จริง)
   L(`local ${nMath1}=math.floor(math.sqrt(${mathA}*${mathB}))`)
   L(`if ${nMath1}~=${mathExp} then ${nGuard}=false end`)
-
-  // Table behavior
   L(`local ${nTbl1}=0`)
   L(`for _,${nV} in ipairs({1,4,9,16,25}) do ${nTbl1}=${nTbl1}+${nV} end`)
   L(`if ${nTbl1}~=${tblSum} then ${nGuard}=false end`)
-
-  // Metatable behavior
   L(`local ${nMeta1}={__index=function(t,k) return ${metaKey} end}`)
   L(`local ${nMeta2}=setmetatable({},${nMeta1})`)
   L(`if ${nMeta2}._candy~=${metaKey} then ${nGuard}=false end`)
-
-  // Upvalue chain
   L(`local ${nUvR}=${uvSeed}`)
   L(`local ${nUvC}=${uvA};${nUvR}=(function() return bit32.bxor(${nUvR},${nUvC}) end)()`)
   L(`${nUvC}=${uvB};${nUvR}=(function() return bit32.bxor(${nUvR},${nUvC}) end)()`)
   L(`${nUvC}=${uvC};${nUvR}=(function() return bit32.bxor(${nUvR},${nUvC}) end)()`)
   L(`if ${nUvR}~=${uvExp} then ${nGuard}=false end`)
-
-  // Coroutine state (EMU ใช้ safe_coroutine ที่ต่างกัน)
   L(`local ${nCo}=coroutine.create(function() end)`)
   L(`local ${nCoSt}=coroutine.status(${nCo})`)
   L(`if ${nCoSt}~="suspended" then ${nGuard}=false end`)
   L(`coroutine.resume(${nCo})`)
   L(`if coroutine.status(${nCo})~="dead" then ${nGuard}=false end`)
-
-  // Pcall behavior
   L(`local ${nPc1},${nPc2}=pcall(function() error("_c_",2) end)`)
   L(`if ${nPc1}~=false or type(${nPc2})~="string" then ${nGuard}=false end`)
-
-  // Dispatch fingerprint table (data-dependent index mapping)
   const dispEntries = dispTblKeys.map((k,i)=>`[${k}]=${dispTblVals[i]}`).join(',')
   L(`local ${nSum}=0;for k,${nV} in pairs({${dispEntries}}) do ${nSum}=(${nSum}+${nV})%16777216 end`)
   L(`if ${nSum}~=${dispSum} then ${nGuard}=false end`)
-
-  // Environment probe (ตรวจ EMU marker)
   L(`local ${nEnvPrb}=getfenv and getfenv()`)
   L(`if ${nEnvPrb} and type(${nEnvPrb})~="table" then ${nGuard}=false end`)
   L(`if ${nEnvPrb} and ${nEnvPrb}.__VMDISPATCH~=nil then ${nGuard}=false end`)
-
-  // Opaque predicates (per-build, static analysis resistant)
   L(`if not(${opaqueA}+${opaqueB}-${opaqueA+opaqueB}==0) then ${nGuard}=false end`)
   L(`if not(bit32 and bit32.bxor(${opaqueA},${opaqueA})==0 or true) then ${nGuard}=false end`)
-
-  // String library probe
   L(`local ${nStrT}=string.char(72,101,108,108,111)`)
   L(`if #${nStrT}~=5 or ${nStrT}:sub(1,1)~="H" then ${nGuard}=false end`)
-
-  // Guard gate — payload gating
   L(`if not ${nGuard} then error("",0) end`)
 
-  // ====== DYNAMIC API RESOLUTION ======
-  // ซ่อน API names ใน runtime table แทนเรียกตรง
+  // ====== DYNAMIC API ======
   L(`local ${nDynApi}={}`)
   const apiNames = ["pairs","ipairs","next","type","tostring","tonumber","pcall","xpcall",
                     "setmetatable","getmetatable","rawget","rawset","rawlen","select","unpack",
@@ -247,15 +207,11 @@ export function generateVM(rootProto: Proto, cfg: VMGenConfig): string {
     L(`${nDynApi}[${fnvHash(Array.from(api).map(c=>c.charCodeAt(0)), cfg.seed & 0xFFFF) >>> 0}]=_ENV and _ENV[string.char(${encoded})] or ${api}`)
   }
 
-  // ====== BASE85 DECODER ======
+  // ====== BASE85 + DECRYPT ======
   L(`local ${nBlob}=${JSON.stringify(b85)}`)
   L(`local ${nKey}=${cfg.seed >>> 0}`)
   L(`local ${nChk}=${checksum >>> 0}`)
-
-  // B85 map
   L(`local ${nIdxMap}={${b85MapEntries}}`)
-
-  // Decode base85 → bytes
   L(`local function ${nDecode}(s,k)`)
   L(`  local ${nStrBuf}={}`)
   L(`  local ${nPos}=1`)
@@ -268,8 +224,6 @@ export function generateVM(rootProto: Proto, cfg: VMGenConfig): string {
   L(`  end`)
   L(`  return ${nStrBuf}`)
   L(`end`)
-
-  // XOR decrypt + rolling hash verify
   L(`local ${nRolling}=${cfg.seed & 0xFF}`)
   L(`local ${nKs}={}`)
   L(`do`)
@@ -290,15 +244,16 @@ export function generateVM(rootProto: Proto, cfg: VMGenConfig): string {
   L(`  ${nRolling2}=(${nRolling2}+${nRaw}[i]+i)%256`)
   L(`end`)
 
-  // Checksum verify (integrity check)
+  // FIX: split multiply to stay within float64 exact range
+  // 16777619 = 256*65536 + 403; each step < 2^40 < 2^53
   L(`local ${nChkVar}=2166136261`)
   L(`for _,${nV} in ipairs(${nRaw}) do`)
-  L(`  ${nChkVar}=bit32.bxor((${nChkVar}*16777619)%4294967296,${nV})`)
+  L(`  ${nChkVar}=bit32.bxor((${nChkVar}*256%4294967296*65536%4294967296+${nChkVar}*403%4294967296)%4294967296,${nV})`)
   L(`end`)
   L(`${nChkVar}=bit32.bxor(${nChkVar},${((cfg.seed ^ 0xCAFEBABE) >>> 0)})%4294967296`)
   L(`if ${nChkVar}~=${checksum >>> 0} then error("",0) end`)
 
-  // ====== BYTECODE DESERIALIZER ======
+  // ====== DESERIALIZER ======
   const nPos2 = N()
   L(`local ${nPos2}=1`)
   L(`local function ${nU8}() local v=${nRaw}[${nPos2}] or 0;${nPos2}=${nPos2}+1;return v end`)
@@ -313,20 +268,16 @@ export function generateVM(rootProto: Proto, cfg: VMGenConfig): string {
   L(`  if exp==2047 then return mant==0 and sign*(1/0) or 0/0 end`)
   L(`  return sign*(1+mant)*2^(exp-1023)`)
   L(`end`)
-  const nStrBuf2 = N()
   L(`local function ${nStrBuf2}()`)
   L(`  local len=${nU16}();local s=""`)
   L(`  for i=1,len do s=s..string.char(${nU8}()) end`)
   L(`  return s`)
   L(`end`)
-
-  // Deserialize proto recursively
   L(`local function ${nProto}()`)
   L(`  local p={params=${nU8}(),vararg=${nU8}()==1,maxStack=${nU8}()}`)
   L(`  local ni=${nU16}();p.instrs={}`)
   L(`  for i=1,ni do`)
   L(`    local op=${nU8}()`)
-  // opcode inverse permutation embedded as table
   const invPerm = inv.slice(0, Op._COUNT)
   L(`    local invP={${invPerm.join(',')}}`)
   L(`    local a=${nU8}();local b=${nU8}();local c=${nU8}();local bx=b*256+c;local sbx=bx-32768;p.instrs[i]={op=invP[op+1] or op,a=a,b=b,c=c,bx=bx,sbx=sbx}`)
@@ -348,8 +299,7 @@ export function generateVM(rootProto: Proto, cfg: VMGenConfig): string {
   const nRoot = N()
   L(`local ${nRoot}=${nProto}()`)
 
-  // ====== VM EXECUTOR ======
-  // Handler table (Dispatcher-Based Interpretation + Polymorphic Handlers)
+  // ====== VM WITH MULTI-REGION DISPATCH ======
   L(`local function ${nVm}(proto,upvals,env,...)`)
   L(`  local ${nRegs}={}`)
   L(`  local ${nPC}=1`)
@@ -359,190 +309,168 @@ export function generateVM(rootProto: Proto, cfg: VMGenConfig): string {
   L(`  local ${nUvals}=upvals or {}`)
   L(`  local ${nStack}={...}`)
   L(`  local ${nEnv}=env or _ENV or getfenv()`)
-
-  // Load params
   L(`  for i=1,proto.params do ${nRegs}[i-1]=${nStack}[i] end`)
   L(`  if proto.vararg then`)
   L(`    ${nRegs}[-1]={table.unpack(${nStack},proto.params+1)}`)
   L(`  end`)
 
-  // Opcode dispatch handlers (Polymorphic VM Handlers)
-  // Shuffle handler order per-build
-  const handlerOrder = seededShuffle(Array.from({length:Op._COUNT},(_,i)=>i), mulberry32(cfg.seed^0xABCD))
+  // ====== 4-REGION DISPATCH TABLES ======
+  // Each opcode lives in exactly one region — assignment changes every build
+  L(`  local ${nR1},${nR2},${nR3},${nR4}={},{},{},{}`)
+  L(`  local ${nRegArr}={${nR1},${nR2},${nR3},${nR4}}`)
+  L(`  local ${nRegMap}={${opRegionAssign.join(',')}}`)
 
-  L(`  local ${nDisp}={}`)
+  // ====== HANDLER DEFINITIONS (shuffled order per-build) ======
+  // Collect all handlers as groups of lines, then shuffle before emitting
+  type HGroup = string[]
+  const handlerGroups: HGroup[] = []
+  const H = (...lines: string[]) => handlerGroups.push(lines)
 
-  // LOADNIL
-  L(`  ${nDisp}[${Op.LOADNIL}]=function(ins) ${nRegs}[ins.a]=nil end`)
-  // LOADBOOL
-  L(`  ${nDisp}[${Op.LOADBOOL}]=function(ins) ${nRegs}[ins.a]=ins.b==1 end`)
-  // LOADINT
-  L(`  ${nDisp}[${Op.LOADINT}]=function(ins) ${nRegs}[ins.a]=${nConsts}[ins.bx+1] end`)
-  // LOADFLOAT
-  L(`  ${nDisp}[${Op.LOADFLOAT}]=function(ins) ${nRegs}[ins.a]=${nConsts}[ins.bx+1] end`)
-  // LOADSTR
-  L(`  ${nDisp}[${Op.LOADSTR}]=function(ins) ${nRegs}[ins.a]=${nConsts}[ins.bx+1] end`)
-  // MOVE
-  L(`  ${nDisp}[${Op.MOVE}]=function(ins) ${nRegs}[ins.a]=${nRegs}[ins.b] end`)
-  // GETGLOBAL
-  L(`  ${nDisp}[${Op.GETGLOBAL}]=function(ins) ${nRegs}[ins.a]=${nEnv}[${nConsts}[ins.bx+1]] end`)
-  // SETGLOBAL
-  L(`  ${nDisp}[${Op.SETGLOBAL}]=function(ins) ${nEnv}[${nConsts}[ins.bx+1]]=${nRegs}[ins.a] end`)
-  // GETUPVAL
-  L(`  ${nDisp}[${Op.GETUPVAL}]=function(ins) ${nRegs}[ins.a]=${nUvals}[ins.b+1] end`)
-  // SETUPVAL
-  L(`  ${nDisp}[${Op.SETUPVAL}]=function(ins) ${nUvals}[ins.b+1]=${nRegs}[ins.a] end`)
-  // GETTABLE
-  L(`  ${nDisp}[${Op.GETTABLE}]=function(ins) ${nRegs}[ins.a]=${nRegs}[ins.b][${nRegs}[ins.c]] end`)
-  // SETTABLE
-  L(`  ${nDisp}[${Op.SETTABLE}]=function(ins) ${nRegs}[ins.a][${nRegs}[ins.b]]=${nRegs}[ins.c] end`)
-  // GETFIELD
-  L(`  ${nDisp}[${Op.GETFIELD}]=function(ins) ${nRegs}[ins.a]=${nRegs}[ins.b][${nConsts}[ins.c+1]] end`)
-  // SETFIELD
-  L(`  ${nDisp}[${Op.SETFIELD}]=function(ins) ${nRegs}[ins.a][${nConsts}[ins.b+1]]=${nRegs}[ins.c] end`)
-  // NEWTABLE
-  L(`  ${nDisp}[${Op.NEWTABLE}]=function(ins) ${nRegs}[ins.a]={} end`)
-  // ADD
-  L(`  ${nDisp}[${Op.ADD}]=function(ins) ${nRegs}[ins.a]=${nRegs}[ins.b]+${nRegs}[ins.c] end`)
-  // SUB
-  L(`  ${nDisp}[${Op.SUB}]=function(ins) ${nRegs}[ins.a]=${nRegs}[ins.b]-${nRegs}[ins.c] end`)
-  // MUL
-  L(`  ${nDisp}[${Op.MUL}]=function(ins) ${nRegs}[ins.a]=${nRegs}[ins.b]*${nRegs}[ins.c] end`)
-  // DIV
-  L(`  ${nDisp}[${Op.DIV}]=function(ins) ${nRegs}[ins.a]=${nRegs}[ins.b]/${nRegs}[ins.c] end`)
-  // MOD
-  L(`  ${nDisp}[${Op.MOD}]=function(ins) ${nRegs}[ins.a]=${nRegs}[ins.b]%${nRegs}[ins.c] end`)
-  // POW
-  L(`  ${nDisp}[${Op.POW}]=function(ins) ${nRegs}[ins.a]=${nRegs}[ins.b]^${nRegs}[ins.c] end`)
-  // IDIV
-  L(`  ${nDisp}[${Op.IDIV}]=function(ins) ${nRegs}[ins.a]=math.floor(${nRegs}[ins.b]/${nRegs}[ins.c]) end`)
-  // BAND
-  L(`  ${nDisp}[${Op.BAND}]=function(ins) ${nRegs}[ins.a]=bit32.band(${nRegs}[ins.b],${nRegs}[ins.c]) end`)
-  // BOR
-  L(`  ${nDisp}[${Op.BOR}]=function(ins) ${nRegs}[ins.a]=bit32.bor(${nRegs}[ins.b],${nRegs}[ins.c]) end`)
-  // BXOR
-  L(`  ${nDisp}[${Op.BXOR}]=function(ins) ${nRegs}[ins.a]=bit32.bxor(${nRegs}[ins.b],${nRegs}[ins.c]) end`)
-  // SHL
-  L(`  ${nDisp}[${Op.SHL}]=function(ins) ${nRegs}[ins.a]=bit32.lshift(${nRegs}[ins.b],${nRegs}[ins.c]) end`)
-  // SHR
-  L(`  ${nDisp}[${Op.SHR}]=function(ins) ${nRegs}[ins.a]=bit32.rshift(${nRegs}[ins.b],${nRegs}[ins.c]) end`)
-  // CONCAT
-  L(`  ${nDisp}[${Op.CONCAT}]=function(ins) local s="";for i=${nRegs}[ins.b],${nRegs}[ins.c] do s=s..tostring(${nRegs}[i]) end;${nRegs}[ins.a]=s end`)
-  // UNM
-  L(`  ${nDisp}[${Op.UNM}]=function(ins) ${nRegs}[ins.a]=-${nRegs}[ins.b] end`)
-  // NOT
-  L(`  ${nDisp}[${Op.NOT}]=function(ins) ${nRegs}[ins.a]=not ${nRegs}[ins.b] end`)
-  // LEN
-  L(`  ${nDisp}[${Op.LEN}]=function(ins) ${nRegs}[ins.a]=#${nRegs}[ins.b] end`)
-  // BNOT
-  L(`  ${nDisp}[${Op.BNOT}]=function(ins) ${nRegs}[ins.a]=bit32.bnot(${nRegs}[ins.b]) end`)
-  // EQ
-  L(`  ${nDisp}[${Op.EQ}]=function(ins) ${nRegs}[ins.a]=${nRegs}[ins.b]==${nRegs}[ins.c] end`)
-  // NE
-  L(`  ${nDisp}[${Op.NE}]=function(ins) ${nRegs}[ins.a]=${nRegs}[ins.b]~=${nRegs}[ins.c] end`)
-  // LT
-  L(`  ${nDisp}[${Op.LT}]=function(ins) ${nRegs}[ins.a]=${nRegs}[ins.b]<${nRegs}[ins.c] end`)
-  // LE
-  L(`  ${nDisp}[${Op.LE}]=function(ins) ${nRegs}[ins.a]=${nRegs}[ins.b]<=${nRegs}[ins.c] end`)
-  // GT
-  L(`  ${nDisp}[${Op.GT}]=function(ins) ${nRegs}[ins.a]=${nRegs}[ins.b]>${nRegs}[ins.c] end`)
-  // GE
-  L(`  ${nDisp}[${Op.GE}]=function(ins) ${nRegs}[ins.a]=${nRegs}[ins.b]>=${nRegs}[ins.c] end`)
-  // JMP
-  L(`  ${nDisp}[${Op.JMP}]=function(ins) ${nPC}=${nPC}+ins.sbx end`)
-  // JMPIF
-  L(`  ${nDisp}[${Op.JMPIF}]=function(ins) if ${nRegs}[ins.a] then ${nPC}=${nPC}+ins.sbx end end`)
-  // JMPNIF
-  L(`  ${nDisp}[${Op.JMPNIF}]=function(ins) if not ${nRegs}[ins.a] then ${nPC}=${nPC}+ins.sbx end end`)
-  // CLOSURE
-  L(`  ${nDisp}[${Op.CLOSURE}]=function(ins)`)
-  L(`    local sub=${nProtos}[ins.bx+1]`)
-  L(`    local uvs={}`)
-  L(`    for i,uv in ipairs(sub.upvals) do`)
-  L(`      if uv.inStack then uvs[i]=${nRegs}[uv.idx]`)
-  L(`      else uvs[i]=${nUvals}[uv.idx+1] end`)
-  L(`    end`)
-  L(`    ${nRegs}[ins.a]=function(...) return ${nVm}(sub,uvs,${nEnv},...) end`)
-  L(`  end`)
-  // CALL
-  L(`  ${nDisp}[${Op.CALL}]=function(ins)`)
-  L(`    local fn=${nRegs}[ins.a]`)
-  L(`    local args={}`)
-  L(`    for i=1,ins.b-1 do args[i]=${nRegs}[ins.a+i] end`)
-  L(`    local res={fn(table.unpack(args))}`)
-  L(`    for i=1,ins.c-1 do ${nRegs}[ins.a+i-1]=res[i] end`)
-  L(`  end`)
-  // TAILCALL
-  L(`  ${nDisp}[${Op.TAILCALL}]=function(ins)`)
-  L(`    local fn=${nRegs}[ins.a]`)
-  L(`    local args={}`)
-  L(`    for i=1,ins.b-1 do args[i]=${nRegs}[ins.a+i] end`)
-  L(`    return fn(table.unpack(args))`)
-  L(`  end`)
-  // RETURN
-  L(`  ${nDisp}[${Op.RETURN}]=function(ins)`)
-  L(`    if ins.b==1 then return end`)
-  L(`    local res={}`)
-  L(`    for i=0,ins.b-2 do res[i+1]=${nRegs}[ins.a+i] end`)
-  L(`    return table.unpack(res)`)
-  L(`  end`)
-  // VARARG
-  L(`  ${nDisp}[${Op.VARARG}]=function(ins)`)
-  L(`    local va=${nRegs}[-1] or {}`)
-  L(`    for i=0,ins.b do ${nRegs}[ins.a+i]=va[i+1] end`)
-  L(`  end`)
-  // FORPREP
-  L(`  ${nDisp}[${Op.FORPREP}]=function(ins) ${nRegs}[ins.a]=${nRegs}[ins.a]-${nRegs}[ins.a+2];${nPC}=${nPC}+ins.sbx end`)
-  // FORLOOP
-  L(`  ${nDisp}[${Op.FORLOOP}]=function(ins)`)
-  L(`    ${nRegs}[ins.a]=${nRegs}[ins.a]+${nRegs}[ins.a+2]`)
-  L(`    if ${nRegs}[ins.a]<=${nRegs}[ins.a+1] then`)
-  L(`      ${nRegs}[ins.a+3]=${nRegs}[ins.a]`)
-  L(`      ${nPC}=${nPC}+ins.sbx`)
-  L(`    end`)
-  L(`  end`)
-  // TFORLOOP
-  L(`  ${nDisp}[${Op.TFORLOOP}]=function(ins)`)
-  L(`    local res={${nRegs}[ins.a](${nRegs}[ins.a+1],${nRegs}[ins.a+2])}`)
-  L(`    if res[1]~=nil then`)
-  L(`      ${nRegs}[ins.a+2]=res[1]`)
-  L(`      for i=1,ins.c do ${nRegs}[ins.a+2+i]=res[i] end`)
-  L(`      ${nPC}=${nPC}+ins.sbx`)
-  L(`    end`)
-  L(`  end`)
-  // SELF
-  L(`  ${nDisp}[${Op.SELF}]=function(ins)`)
-  L(`    ${nRegs}[ins.a+1]=${nRegs}[ins.b]`)
-  L(`    ${nRegs}[ins.a]=${nRegs}[ins.b][${nConsts}[ins.c+1]]`)
-  L(`  end`)
-  // GETFIELD alias
-  L(`  ${nDisp}[${Op.ADDK}]=function(ins) ${nRegs}[ins.a]=${nRegs}[ins.b]+${nConsts}[ins.c+1] end`)
-  L(`  ${nDisp}[${Op.SUBK}]=function(ins) ${nRegs}[ins.a]=${nRegs}[ins.b]-${nConsts}[ins.c+1] end`)
-  L(`  ${nDisp}[${Op.MULK}]=function(ins) ${nRegs}[ins.a]=${nRegs}[ins.b]*${nConsts}[ins.c+1] end`)
-  L(`  ${nDisp}[${Op.DIVK}]=function(ins) ${nRegs}[ins.a]=${nRegs}[ins.b]/${nConsts}[ins.c+1] end`)
-  L(`  ${nDisp}[${Op.MODK}]=function(ins) ${nRegs}[ins.a]=${nRegs}[ins.b]%${nConsts}[ins.c+1] end`)
-  L(`  ${nDisp}[${Op.GETTABK}]=function(ins) ${nRegs}[ins.a]=${nRegs}[ins.b][${nConsts}[ins.c+1]] end`)
-  L(`  ${nDisp}[${Op.SETTABK}]=function(ins) ${nRegs}[ins.a][${nConsts}[ins.b+1]]=${nConsts}[ins.c+1] end`)
-  // SETLIST
-  L(`  ${nDisp}[${Op.SETLIST}]=function(ins)`)
-  L(`    for i=1,ins.c do ${nRegs}[ins.a][ins.b+i-1]=${nRegs}[ins.a+i] end`)
-  L(`  end`)
-  // CHECKPOINT (runtime integrity, EMU ต้องผ่าน every instruction)
-  const cpExpected = arxMix(cfg.seed, 0x31337) & 0xFFFF
-  L(`  ${nDisp}[${Op.CHECKPOINT}]=function(ins)`)
-  L(`    local h=${cfg.seed & 0xFFFF}`)
-  L(`    h=(h*${opaqueA})%65536`)
-  L(`    if h~=${cpExpected} then error("",0) end`)
-  L(`  end`)
-  // POISON (crash any emulator that hits this — dead code paths only)
-  L(`  ${nDisp}[${Op.POISON}]=function(ins) error("",0) end`)
+  H(`  ${regionOf(Op.LOADNIL)}[${Op.LOADNIL}]=function(ins) ${nRegs}[ins.a]=nil end`)
+  H(`  ${regionOf(Op.LOADBOOL)}[${Op.LOADBOOL}]=function(ins) ${nRegs}[ins.a]=ins.b==1 end`)
+  H(`  ${regionOf(Op.LOADINT)}[${Op.LOADINT}]=function(ins) ${nRegs}[ins.a]=${nConsts}[ins.bx+1] end`)
+  H(`  ${regionOf(Op.LOADFLOAT)}[${Op.LOADFLOAT}]=function(ins) ${nRegs}[ins.a]=${nConsts}[ins.bx+1] end`)
+  H(`  ${regionOf(Op.LOADSTR)}[${Op.LOADSTR}]=function(ins) ${nRegs}[ins.a]=${nConsts}[ins.bx+1] end`)
+  H(`  ${regionOf(Op.MOVE)}[${Op.MOVE}]=function(ins) ${nRegs}[ins.a]=${nRegs}[ins.b] end`)
+  H(`  ${regionOf(Op.GETGLOBAL)}[${Op.GETGLOBAL}]=function(ins) ${nRegs}[ins.a]=${nEnv}[${nConsts}[ins.bx+1]] end`)
+  H(`  ${regionOf(Op.SETGLOBAL)}[${Op.SETGLOBAL}]=function(ins) ${nEnv}[${nConsts}[ins.bx+1]]=${nRegs}[ins.a] end`)
+  H(`  ${regionOf(Op.GETUPVAL)}[${Op.GETUPVAL}]=function(ins) ${nRegs}[ins.a]=${nUvals}[ins.b+1] end`)
+  H(`  ${regionOf(Op.SETUPVAL)}[${Op.SETUPVAL}]=function(ins) ${nUvals}[ins.b+1]=${nRegs}[ins.a] end`)
+  H(`  ${regionOf(Op.GETTABLE)}[${Op.GETTABLE}]=function(ins) ${nRegs}[ins.a]=${nRegs}[ins.b][${nRegs}[ins.c]] end`)
+  H(`  ${regionOf(Op.SETTABLE)}[${Op.SETTABLE}]=function(ins) ${nRegs}[ins.a][${nRegs}[ins.b]]=${nRegs}[ins.c] end`)
+  H(`  ${regionOf(Op.GETFIELD)}[${Op.GETFIELD}]=function(ins) ${nRegs}[ins.a]=${nRegs}[ins.b][${nConsts}[ins.c+1]] end`)
+  H(`  ${regionOf(Op.SETFIELD)}[${Op.SETFIELD}]=function(ins) ${nRegs}[ins.a][${nConsts}[ins.b+1]]=${nRegs}[ins.c] end`)
+  H(`  ${regionOf(Op.NEWTABLE)}[${Op.NEWTABLE}]=function(ins) ${nRegs}[ins.a]={} end`)
+  H(`  ${regionOf(Op.ADD)}[${Op.ADD}]=function(ins) ${nRegs}[ins.a]=${nRegs}[ins.b]+${nRegs}[ins.c] end`)
+  H(`  ${regionOf(Op.SUB)}[${Op.SUB}]=function(ins) ${nRegs}[ins.a]=${nRegs}[ins.b]-${nRegs}[ins.c] end`)
+  H(`  ${regionOf(Op.MUL)}[${Op.MUL}]=function(ins) ${nRegs}[ins.a]=${nRegs}[ins.b]*${nRegs}[ins.c] end`)
+  H(`  ${regionOf(Op.DIV)}[${Op.DIV}]=function(ins) ${nRegs}[ins.a]=${nRegs}[ins.b]/${nRegs}[ins.c] end`)
+  H(`  ${regionOf(Op.MOD)}[${Op.MOD}]=function(ins) ${nRegs}[ins.a]=${nRegs}[ins.b]%${nRegs}[ins.c] end`)
+  H(`  ${regionOf(Op.POW)}[${Op.POW}]=function(ins) ${nRegs}[ins.a]=${nRegs}[ins.b]^${nRegs}[ins.c] end`)
+  H(`  ${regionOf(Op.IDIV)}[${Op.IDIV}]=function(ins) ${nRegs}[ins.a]=math.floor(${nRegs}[ins.b]/${nRegs}[ins.c]) end`)
+  H(`  ${regionOf(Op.BAND)}[${Op.BAND}]=function(ins) ${nRegs}[ins.a]=bit32.band(${nRegs}[ins.b],${nRegs}[ins.c]) end`)
+  H(`  ${regionOf(Op.BOR)}[${Op.BOR}]=function(ins) ${nRegs}[ins.a]=bit32.bor(${nRegs}[ins.b],${nRegs}[ins.c]) end`)
+  H(`  ${regionOf(Op.BXOR)}[${Op.BXOR}]=function(ins) ${nRegs}[ins.a]=bit32.bxor(${nRegs}[ins.b],${nRegs}[ins.c]) end`)
+  H(`  ${regionOf(Op.SHL)}[${Op.SHL}]=function(ins) ${nRegs}[ins.a]=bit32.lshift(${nRegs}[ins.b],${nRegs}[ins.c]) end`)
+  H(`  ${regionOf(Op.SHR)}[${Op.SHR}]=function(ins) ${nRegs}[ins.a]=bit32.rshift(${nRegs}[ins.b],${nRegs}[ins.c]) end`)
+  // FIX: ins.b / ins.c are register INDICES, not values
+  H(`  ${regionOf(Op.CONCAT)}[${Op.CONCAT}]=function(ins) local s="";for i=ins.b,ins.c do s=s..tostring(${nRegs}[i]) end;${nRegs}[ins.a]=s end`)
+  H(`  ${regionOf(Op.UNM)}[${Op.UNM}]=function(ins) ${nRegs}[ins.a]=-${nRegs}[ins.b] end`)
+  H(`  ${regionOf(Op.NOT)}[${Op.NOT}]=function(ins) ${nRegs}[ins.a]=not ${nRegs}[ins.b] end`)
+  H(`  ${regionOf(Op.LEN)}[${Op.LEN}]=function(ins) ${nRegs}[ins.a]=#${nRegs}[ins.b] end`)
+  H(`  ${regionOf(Op.BNOT)}[${Op.BNOT}]=function(ins) ${nRegs}[ins.a]=bit32.bnot(${nRegs}[ins.b]) end`)
+  H(`  ${regionOf(Op.EQ)}[${Op.EQ}]=function(ins) ${nRegs}[ins.a]=${nRegs}[ins.b]==${nRegs}[ins.c] end`)
+  H(`  ${regionOf(Op.NE)}[${Op.NE}]=function(ins) ${nRegs}[ins.a]=${nRegs}[ins.b]~=${nRegs}[ins.c] end`)
+  H(`  ${regionOf(Op.LT)}[${Op.LT}]=function(ins) ${nRegs}[ins.a]=${nRegs}[ins.b]<${nRegs}[ins.c] end`)
+  H(`  ${regionOf(Op.LE)}[${Op.LE}]=function(ins) ${nRegs}[ins.a]=${nRegs}[ins.b]<=${nRegs}[ins.c] end`)
+  H(`  ${regionOf(Op.GT)}[${Op.GT}]=function(ins) ${nRegs}[ins.a]=${nRegs}[ins.b]>${nRegs}[ins.c] end`)
+  H(`  ${regionOf(Op.GE)}[${Op.GE}]=function(ins) ${nRegs}[ins.a]=${nRegs}[ins.b]>=${nRegs}[ins.c] end`)
+  H(`  ${regionOf(Op.JMP)}[${Op.JMP}]=function(ins) ${nPC}=${nPC}+ins.sbx end`)
+  H(`  ${regionOf(Op.JMPIF)}[${Op.JMPIF}]=function(ins) if ${nRegs}[ins.a] then ${nPC}=${nPC}+ins.sbx end end`)
+  H(`  ${regionOf(Op.JMPNIF)}[${Op.JMPNIF}]=function(ins) if not ${nRegs}[ins.a] then ${nPC}=${nPC}+ins.sbx end end`)
+  H(
+    `  ${regionOf(Op.CLOSURE)}[${Op.CLOSURE}]=function(ins)`,
+    `    local sub=${nProtos}[ins.bx+1]`,
+    `    local uvs={}`,
+    `    for i,uv in ipairs(sub.upvals) do`,
+    `      if uv.inStack then uvs[i]=${nRegs}[uv.idx]`,
+    `      else uvs[i]=${nUvals}[uv.idx+1] end`,
+    `    end`,
+    `    ${nRegs}[ins.a]=function(...) return ${nVm}(sub,uvs,${nEnv},...) end`,
+    `  end`
+  )
+  H(
+    `  ${regionOf(Op.CALL)}[${Op.CALL}]=function(ins)`,
+    `    local fn=${nRegs}[ins.a]`,
+    `    local args={}`,
+    `    for i=1,ins.b-1 do args[i]=${nRegs}[ins.a+i] end`,
+    `    local res={fn(table.unpack(args))}`,
+    `    for i=1,ins.c-1 do ${nRegs}[ins.a+i-1]=res[i] end`,
+    `  end`
+  )
+  H(
+    `  ${regionOf(Op.TAILCALL)}[${Op.TAILCALL}]=function(ins)`,
+    `    local fn=${nRegs}[ins.a]`,
+    `    local args={}`,
+    `    for i=1,ins.b-1 do args[i]=${nRegs}[ins.a+i] end`,
+    `    return fn(table.unpack(args))`,
+    `  end`
+  )
+  H(
+    `  ${regionOf(Op.RETURN)}[${Op.RETURN}]=function(ins)`,
+    `    if ins.b==1 then return end`,
+    `    local res={}`,
+    `    for i=0,ins.b-2 do res[i+1]=${nRegs}[ins.a+i] end`,
+    `    return table.unpack(res)`,
+    `  end`
+  )
+  H(
+    `  ${regionOf(Op.VARARG)}[${Op.VARARG}]=function(ins)`,
+    `    local va=${nRegs}[-1] or {}`,
+    `    for i=0,ins.b do ${nRegs}[ins.a+i]=va[i+1] end`,
+    `  end`
+  )
+  H(`  ${regionOf(Op.FORPREP)}[${Op.FORPREP}]=function(ins) ${nRegs}[ins.a]=${nRegs}[ins.a]-${nRegs}[ins.a+2];${nPC}=${nPC}+ins.sbx end`)
+  H(
+    `  ${regionOf(Op.FORLOOP)}[${Op.FORLOOP}]=function(ins)`,
+    `    ${nRegs}[ins.a]=${nRegs}[ins.a]+${nRegs}[ins.a+2]`,
+    `    if ${nRegs}[ins.a]<=${nRegs}[ins.a+1] then`,
+    `      ${nRegs}[ins.a+3]=${nRegs}[ins.a]`,
+    `      ${nPC}=${nPC}+ins.sbx`,
+    `    end`,
+    `  end`
+  )
+  H(
+    `  ${regionOf(Op.TFORLOOP)}[${Op.TFORLOOP}]=function(ins)`,
+    `    local res={${nRegs}[ins.a](${nRegs}[ins.a+1],${nRegs}[ins.a+2])}`,
+    `    if res[1]~=nil then`,
+    `      ${nRegs}[ins.a+2]=res[1]`,
+    `      for i=1,ins.c do ${nRegs}[ins.a+2+i]=res[i] end`,
+    `      ${nPC}=${nPC}+ins.sbx`,
+    `    end`,
+    `  end`
+  )
+  H(
+    `  ${regionOf(Op.SELF)}[${Op.SELF}]=function(ins)`,
+    `    ${nRegs}[ins.a+1]=${nRegs}[ins.b]`,
+    `    ${nRegs}[ins.a]=${nRegs}[ins.b][${nConsts}[ins.c+1]]`,
+    `  end`
+  )
+  H(`  ${regionOf(Op.ADDK)}[${Op.ADDK}]=function(ins) ${nRegs}[ins.a]=${nRegs}[ins.b]+${nConsts}[ins.c+1] end`)
+  H(`  ${regionOf(Op.SUBK)}[${Op.SUBK}]=function(ins) ${nRegs}[ins.a]=${nRegs}[ins.b]-${nConsts}[ins.c+1] end`)
+  H(`  ${regionOf(Op.MULK)}[${Op.MULK}]=function(ins) ${nRegs}[ins.a]=${nRegs}[ins.b]*${nConsts}[ins.c+1] end`)
+  H(`  ${regionOf(Op.DIVK)}[${Op.DIVK}]=function(ins) ${nRegs}[ins.a]=${nRegs}[ins.b]/${nConsts}[ins.c+1] end`)
+  H(`  ${regionOf(Op.MODK)}[${Op.MODK}]=function(ins) ${nRegs}[ins.a]=${nRegs}[ins.b]%${nConsts}[ins.c+1] end`)
+  H(`  ${regionOf(Op.GETTABK)}[${Op.GETTABK}]=function(ins) ${nRegs}[ins.a]=${nRegs}[ins.b][${nConsts}[ins.c+1]] end`)
+  H(`  ${regionOf(Op.SETTABK)}[${Op.SETTABK}]=function(ins) ${nRegs}[ins.a][${nConsts}[ins.b+1]]=${nConsts}[ins.c+1] end`)
+  H(
+    `  ${regionOf(Op.SETLIST)}[${Op.SETLIST}]=function(ins)`,
+    `    for i=1,ins.c do ${nRegs}[ins.a][ins.b+i-1]=${nRegs}[ins.a+i] end`,
+    `  end`
+  )
+  H(
+    `  ${regionOf(Op.CHECKPOINT)}[${Op.CHECKPOINT}]=function(ins)`,
+    `    local h=${cfg.seed & 0xFFFF}`,
+    `    h=(h*${opaqueA})%65536`,
+    `    if h~=${cpExpected} then error("",0) end`,
+    `  end`
+  )
+  H(`  ${regionOf(Op.POISON)}[${Op.POISON}]=function(ins) error("",0) end`)
 
-  // ====== DISPATCH LOOP (State-Machine Control Flow) ======
+  // Emit handlers in shuffled order — different code layout every build
+  const shuffled = seededShuffle([...handlerGroups], mulberry32(cfg.seed ^ 0xBEEF1234))
+  for (const group of shuffled) {
+    for (const line of group) L(line)
+  }
+
+  // ====== DISPATCH LOOP ======
+  // nRegArr[nRegMap[op+1]+1] → selects the correct region table for this opcode
+  // nRegMap is 0-based, Lua tables are 1-based, so +1 on both lookups
   L(`  while true do`)
   L(`    local ins=${nInstrs}[${nPC}]`)
   L(`    if not ins then break end`)
   L(`    ${nPC}=${nPC}+1`)
-  L(`    local h=${nDisp}[ins.op]`)
+  L(`    local h=${nRegArr}[${nRegMap}[ins.op+1]+1][ins.op]`)
   L(`    if h then`)
   L(`      local r={h(ins)}`)
   L(`      if #r>0 then return table.unpack(r) end`)
@@ -550,10 +478,6 @@ export function generateVM(rootProto: Proto, cfg: VMGenConfig): string {
   L(`  end`)
   L(`end`)
 
-  // ====== MULTI-STAGE LOADER ======
-  // Stage 1: decrypt + verify
-  // Stage 2: deserialize
-  // Stage 3: execute
   L(`local function ${nStage1}()`)
   L(`  return ${nVm}(${nRoot},nil,_ENV or getfenv())`)
   L(`end`)
@@ -563,4 +487,3 @@ export function generateVM(rootProto: Proto, cfg: VMGenConfig): string {
 }
 
 export { mulberry32 } from "./utils"
-
