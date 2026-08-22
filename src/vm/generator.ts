@@ -147,7 +147,11 @@ export function generateVM(rootProto: Proto, cfg: VMGenConfig): string {
   const uvC = Math.floor(rng() * 255) + 1
   const uvExp = ((uvSeed ^ uvA) ^ uvB) ^ uvC
   const metaKey = Math.floor(rng() * 99999) + 1
-  const dispTblKeys = Array.from({length:8}, () => Math.floor(rng() * 255))
+  // ใช้ seededShuffle เพื่อให้ keys unique เสมอ (ป้องกัน birthday collision)
+  const dispTblKeys = seededShuffle(
+    Array.from({length: 255}, (_, i) => i),
+    mulberry32(cfg.seed ^ 0x5A3C1F2E)
+  ).slice(0, 8)
   const dispTblVals = Array.from({length:8}, () => Math.floor(rng() * 255))
   const dispSum = dispTblVals.reduce((a,b)=>(a+b)%16777216,0)
   const cpExpected = arxMix(cfg.seed, 0x31337) & 0xFFFF
@@ -159,7 +163,7 @@ export function generateVM(rootProto: Proto, cfg: VMGenConfig): string {
   const out: string[] = []
   const L = (...lines: string[]) => lines.forEach(l => out.push(l))
 
-  L(`-- zisuay`)
+  L(`-- zisuay Obfuscate Premium v0.1 by x2nyx`)
 
   // ====== ANTI-EMU GUARD (DEBUG) ======
   const dispEntries = dispTblKeys.map((k,i)=>`[${k}]=${dispTblVals[i]}`).join(',')
@@ -487,4 +491,3 @@ export function generateVM(rootProto: Proto, cfg: VMGenConfig): string {
 }
 
 export { mulberry32 } from "./utils"
-
