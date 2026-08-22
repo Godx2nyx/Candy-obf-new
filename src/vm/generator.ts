@@ -159,45 +159,40 @@ export function generateVM(rootProto: Proto, cfg: VMGenConfig): string {
   const out: string[] = []
   const L = (...lines: string[]) => lines.forEach(l => out.push(l))
 
-  L(`-- zisuay obf Premium v0.1`)
+  L(`-- zisuay Team`)
 
-  // ====== ANTI-EMU GUARD ======
-L(`if L(`local ${nFib1},${nFib2}=1,1`)
-L(`for ${nFibN}=2,${fibN} do local ${nFibT}=${nFib2};${nFib2}=${nFib1}+${nFib2};${nFib1}=${nFibT} end`)
-L(`if ${nFib2}%65536~=${fibExpected} then error("AT1") end`)
-
-L(`local ${nMath1}=math.floor(math.sqrt(${mathA}*${mathB}))`)
-L(`if ${nMath1}~=${mathExp} then error("AT2") end`)
-
-L(`local ${nTbl1}=0`)
-L(`for _,${nV} in ipairs({1,4,9,16,25}) do ${nTbl1}=${nTbl1}+${nV} end`)
-L(`if ${nTbl1}~=${tblSum} then error("AT3") end`)
-
-L(`local ${nMeta1}={__index=function(t,k) return ${metaKey} end}`)
-L(`local ${nMeta2}=setmetatable({},${nMeta1})`)
-L(`if ${nMeta2}._candy~=${metaKey} then error("AT4") end`)
-
-L(`local ${nUvR}=${uvSeed}`)
-L(`local ${nUvC}=${uvA};${nUvR}=(function() return bit32.bxor(${nUvR},${nUvC}) end)()`)
-L(`${nUvC}=${uvB};${nUvR}=(function() return bit32.bxor(${nUvR},${nUvC}) end)()`)
-L(`${nUvC}=${uvC};${nUvR}=(function() return bit32.bxor(${nUvR},${nUvC}) end)()`)
-L(`if ${nUvR}~=${uvExp} then error("AT5") end`)
-
-L(`local ${nCo}=coroutine.create(function() end)`)
-L(`local ${nCoSt}=coroutine.status(${nCo})`)
-L(`if ${nCoSt}~="suspended" then error("AT6") end`)
-L(`coroutine.resume(${nCo})`)
-L(`if coroutine.status(${nCo})~="dead" then error("AT7") end`)
-
-L(`local ${nPc1},${nPc2}=pcall(function() error("_c_",2) end)`)
-L(`if ${nPc1}~=false or type(${nPc2})~="string" then error("AT8") end`)
-
-L(`local ${nSum}=0;for k,${nV} in pairs({${dispEntries}}) do ${nSum}=(${nSum}+${nV})%16777216 end`)
-L(`if ${nSum}~=${dispSum} then error("AT9") end`)
-
-L(`local ${nEnvPrb}=getfenv and getfenv()`)
-L(`if ${nEnvPrb} and type(${nEnvPrb})~="table" then error("AT10") end`)
-L(`if ${nEnvPrb} and ${nEnvPrb}.__VMDISPATCH~=nil then error("AT11") end`)
+  // ====== ANTI-EMU GUARD (DEBUG) ======
+  const dispEntries = dispTblKeys.map((k,i)=>`[${k}]=${dispTblVals[i]}`).join(',')
+  L(`local ${nFib1},${nFib2}=1,1`)
+  L(`for ${nFibN}=2,${fibN} do local ${nFibT}=${nFib2};${nFib2}=${nFib1}+${nFib2};${nFib1}=${nFibT} end`)
+  L(`if ${nFib2}%65536~=${fibExpected} then error("AT1") end`)
+  L(`local ${nMath1}=math.floor(math.sqrt(${mathA}*${mathB}))`)
+  L(`if ${nMath1}~=${mathExp} then error("AT2") end`)
+  L(`local ${nTbl1}=0`)
+  L(`for _,${nV} in ipairs({1,4,9,16,25}) do ${nTbl1}=${nTbl1}+${nV} end`)
+  L(`if ${nTbl1}~=${tblSum} then error("AT3") end`)
+  L(`local ${nMeta1}={__index=function(t,k) return ${metaKey} end}`)
+  L(`local ${nMeta2}=setmetatable({},${nMeta1})`)
+  L(`if ${nMeta2}._candy~=${metaKey} then error("AT4") end`)
+  L(`local ${nUvR}=${uvSeed}`)
+  L(`local ${nUvC}=${uvA};${nUvR}=(function() return bit32.bxor(${nUvR},${nUvC}) end)()`)
+  L(`${nUvC}=${uvB};${nUvR}=(function() return bit32.bxor(${nUvR},${nUvC}) end)()`)
+  L(`${nUvC}=${uvC};${nUvR}=(function() return bit32.bxor(${nUvR},${nUvC}) end)()`)
+  L(`if ${nUvR}~=${uvExp} then error("AT5") end`)
+  L(`local ${nCo}=coroutine.create(function() end)`)
+  L(`local ${nCoSt}=coroutine.status(${nCo})`)
+  L(`if ${nCoSt}~="suspended" then error("AT6") end`)
+  L(`coroutine.resume(${nCo})`)
+  L(`if coroutine.status(${nCo})~="dead" then error("AT7") end`)
+  L(`local ${nPc1},${nPc2}=pcall(function() error("_c_",2) end)`)
+  L(`if ${nPc1}~=false or type(${nPc2})~="string" then error("AT8") end`)
+  L(`local ${nSum}=0;for k,${nV} in pairs({${dispEntries}}) do ${nSum}=(${nSum}+${nV})%16777216 end`)
+  L(`if ${nSum}~=${dispSum} then error("AT9") end`)
+  L(`local ${nEnvPrb}=getfenv and getfenv()`)
+  L(`if ${nEnvPrb} and type(${nEnvPrb})~="table" then error("AT10") end`)
+  L(`if ${nEnvPrb} and ${nEnvPrb}.__VMDISPATCH~=nil then error("AT11") end`)
+  L(`local ${nStrT}=string.char(72,101,108,108,111)`)
+  L(`if #${nStrT}~=5 or ${nStrT}:sub(1,1)~="H" then error("AT12") end`)
 
   // ====== DYNAMIC API ======
   L(`local ${nDynApi}={}`)
