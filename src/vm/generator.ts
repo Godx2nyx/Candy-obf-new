@@ -115,6 +115,7 @@ export function generateVM(rootProto: Proto, cfg: VMGenConfig): string {
   const nPayload = N(), nStage1 = N(), nStage2 = N()
   const nChunk   = N(), nChunkI = N(), nChunkN = N()
   const nStrBuf2 = N()
+  const nDone    = N()   // sentinel: marks "this handler wants to return from VM"
 
   // ====== MULTI-REGION DISPATCH NAMES ======
   // 4 region tables — each opcode is assigned to exactly one, per-build
@@ -313,6 +314,9 @@ export function generateVM(rootProto: Proto, cfg: VMGenConfig): string {
   L(`  if proto.vararg then`)
   L(`    ${nRegs}[-1]={table.unpack(${nStack},proto.params+1)}`)
   L(`  end`)
+  // Unique per VM-call — RETURN handler wraps results in {nDone, ...values}
+  // Dispatch loop checks r[1]==nDone to know the function is terminating
+  L(`  local ${nDone}={}`)
 
   // ====== 4-REGION DISPATCH TABLES ======
   // Each opcode lives in exactly one region — assignment changes every build
@@ -398,9 +402,9 @@ export function generateVM(rootProto: Proto, cfg: VMGenConfig): string {
   )
   H(
     `  ${regionOf(Op.RETURN)}[${Op.RETURN}]=function(ins)`,
-    `    if ins.b==1 then return end`,
-    `    local res={}`,
-    `    for i=0,ins.b-2 do res[i+1]=${nRegs}[ins.a+i] end`,
+    `    if ins.b==1 then return ${nDone} end`,
+    `    local res={${nDone}}`,
+    `    for i=0,ins.b-2 do res[#res+1]=${nRegs}[ins.a+i] end`,
     `    return table.unpack(res)`,
     `  end`
   )
@@ -473,7 +477,7 @@ export function generateVM(rootProto: Proto, cfg: VMGenConfig): string {
   L(`    local h=${nRegArr}[${nRegMap}[ins.op+1]+1][ins.op]`)
   L(`    if h then`)
   L(`      local r={h(ins)}`)
-  L(`      if #r>0 then return table.unpack(r) end`)
+  L(`      if r[1]==${nDone} then return table.unpack(r,2) end`)
   L(`    end`)
   L(`  end`)
   L(`end`)
