@@ -159,7 +159,7 @@ export function generateVM(rootProto: Proto, cfg: VMGenConfig): string {
   const out: string[] = []
   const L = (...lines: string[]) => lines.forEach(l => out.push(l))
 
-  L(`-- zisuay Luau obfuscate Premium v0.1`)
+  L(`-- zisuay`)
 
   // ====== ANTI-EMU GUARD (DEBUG) ======
   const dispEntries = dispTblKeys.map((k,i)=>`[${k}]=${dispTblVals[i]}`).join(',')
@@ -238,7 +238,7 @@ export function generateVM(rootProto: Proto, cfg: VMGenConfig): string {
   L(`for i=1,#${nPayload} do`)
   L(`  local k=bit32.bxor(bit32.bxor(${nKs}[i],${nRolling2}),(i-1)%256)`)
   L(`  ${nRaw}[i]=bit32.bxor(${nPayload}[i],k)`)
-  L(`  ${nRolling2}=(${nRolling2}+${nRaw}[i]+i)%256`)
+  L(`  ${nRolling2}=(${nRolling2}+${nRaw}[i]+(i-1))%256`)
   L(`end`)
 
   // FIX: split multiply to stay within float64 exact range
@@ -487,3 +487,4 @@ export function generateVM(rootProto: Proto, cfg: VMGenConfig): string {
 }
 
 export { mulberry32 } from "./utils"
+
