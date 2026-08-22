@@ -135,7 +135,7 @@ export function generateVM(rootProto: Proto, cfg: VMGenConfig): string {
   const opaqueB = 1 + Math.floor(rng() * 65535)
   const fibN = 18 + Math.floor(rng() * 10)
   let fa = 1, fb = 1
-  for (let i = 2; i < fibN; i++) { [fa, fb] = [fb, fa + fb] }
+  for (let i = 2; i <= fibN; i++) { [fa, fb] = [fb, fa + fb] }
   const fibExpected = fb % 65536
   const mathA = 100 + Math.floor(rng() * 900)
   const mathB = 100 + Math.floor(rng() * 900)
@@ -159,7 +159,7 @@ export function generateVM(rootProto: Proto, cfg: VMGenConfig): string {
   const out: string[] = []
   const L = (...lines: string[]) => lines.forEach(l => out.push(l))
 
-  L(`-- zisuay Team`)
+  L(`-- zisuay Luau obfuscate Premium v0.1`)
 
   // ====== ANTI-EMU GUARD (DEBUG) ======
   const dispEntries = dispTblKeys.map((k,i)=>`[${k}]=${dispTblVals[i]}`).join(',')
