@@ -200,7 +200,7 @@ export class Parser {
     return { kind: "ReturnStatement", values, loc }
   }
 
-  private parseExpressionStatement(): AST.ExpressionStatement {
+  private parseExpressionStatement(): AST.Statement {
     const loc = this.loc()
     const expr = this.parseSuffixExpression()
 
@@ -209,7 +209,7 @@ export class Parser {
       while (this.match(",")) targets.push(this.parseSuffixExpression())
       this.expect("=")
       const values = this.parseExpressionList()
-      return { kind: "ExpressionStatement", expression: { kind: "CallExpression", callee: targets[0], args: values, loc } as any, loc }
+      return { kind: "AssignStatement", targets, values, loc }
     }
 
     if (expr.kind !== "CallExpression" && expr.kind !== "MethodCallExpression") {
@@ -466,4 +466,3 @@ export function parse(tokens: Token[]): { ast: AST.Block; errors: { message: str
   const ast = parser.parse()
   return { ast, errors: parser.getErrors() }
 }
-
