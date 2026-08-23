@@ -163,7 +163,9 @@ export function generateVM(rootProto: Proto, cfg: VMGenConfig): string {
   const out: string[] = []
   const L = (...lines: string[]) => lines.forEach(l => out.push(l))
 
-  L(`-- zis luau obfuscate Premium v0.1`)
+  // Keep the banner a block comment so minification cannot comment out the
+  // entire generated program when line separators are removed.
+  L(`--[=[ zis luau obfuscate Premium v0.1 ]=]`)
 
   // ====== ANTI-EMU GUARD (DEBUG) ======
   const dispEntries = dispTblKeys.map((k,i)=>`[${k}]=${dispTblVals[i]}`).join(',')
@@ -219,8 +221,15 @@ export function generateVM(rootProto: Proto, cfg: VMGenConfig): string {
   L(`  while ${nPos}<=#s do`)
   L(`    local v=0`)
   L(`    local chunk=math.min(5,#s-${nPos}+1)`)
+  // base85Encode emits only chunk+1 digits for a short final block. Restore
+  // the omitted digits with the standard max-value padding before converting
+  // the 32-bit value back to bytes. Zero padding can round the recovered
+  // high bytes down and corrupt the final 1–3 bytes.
+  // Without this, every payload whose length is not divisible by four is
+  // corrupted at the final block and the VM checksum aborts the script.
   L(`    for j=0,chunk-1 do v=v*85+(${nIdxMap}[s:byte(${nPos}+j)] or 0) end`)
-  L(`    for j=chunk-2,0,-1 do ${nStrBuf}[#${nStrBuf}+1]=math.floor(v/256^j)%256 end`)
+  L(`    for j=chunk,4 do v=v*85+84 end`)
+  L(`    for j=3,5-chunk,-1 do ${nStrBuf}[#${nStrBuf}+1]=math.floor(v/256^j)%256 end`)
   L(`    ${nPos}=${nPos}+chunk`)
   L(`  end`)
   L(`  return ${nStrBuf}`)
@@ -264,7 +273,10 @@ export function generateVM(rootProto: Proto, cfg: VMGenConfig): string {
   L(`  local b={};for i=1,8 do b[i]=${nU8}() end`)
   L(`  local sign=b[8]>127 and -1 or 1`)
   L(`  local exp=((b[8]%128)*16+(math.floor(b[7]/16)))`)
-  L(`  local mant=0;for i=7,1,-1 do mant=(mant+(i==7 and b[i]%16 or b[i]))/256 end`)
+  // Rebuild the 52-bit mantissa from the little-endian bytes. The old
+  // recurrence divided on every iteration, which discarded the high-order
+  // bits and decoded values such as 3 as 2.
+  L(`  local mant=0;for i=7,1,-1 do mant=mant*256+(i==7 and b[i]%16 or b[i]) end;mant=mant/2^52`)
   L(`  if exp==0 then return sign*mant*2^(-1022) end`)
   L(`  if exp==2047 then return mant==0 and sign*(1/0) or 0/0 end`)
   L(`  return sign*(1+mant)*2^(exp-1023)`)
@@ -357,8 +369,10 @@ export function generateVM(rootProto: Proto, cfg: VMGenConfig): string {
   H(`  ${regionOf(Op.BXOR)}[${Op.BXOR}]=function(ins) ${nRegs}[ins.a]=bit32.bxor(${nRegs}[ins.b],${nRegs}[ins.c]) end`)
   H(`  ${regionOf(Op.SHL)}[${Op.SHL}]=function(ins) ${nRegs}[ins.a]=bit32.lshift(${nRegs}[ins.b],${nRegs}[ins.c]) end`)
   H(`  ${regionOf(Op.SHR)}[${Op.SHR}]=function(ins) ${nRegs}[ins.a]=bit32.rshift(${nRegs}[ins.b],${nRegs}[ins.c]) end`)
-  // FIX: ins.b / ins.c are register INDICES, not values
-  H(`  ${regionOf(Op.CONCAT)}[${Op.CONCAT}]=function(ins) local s="";for i=ins.b,ins.c do s=s..tostring(${nRegs}[i]) end;${nRegs}[ins.a]=s end`)
+  // CONCAT receives two arbitrary register operands. Walking every register
+  // between them also joins unrelated temporaries (and can leak functions or
+  // nil values into the result).
+  H(`  ${regionOf(Op.CONCAT)}[${Op.CONCAT}]=function(ins) ${nRegs}[ins.a]=tostring(${nRegs}[ins.b])..tostring(${nRegs}[ins.c]) end`)
   H(`  ${regionOf(Op.UNM)}[${Op.UNM}]=function(ins) ${nRegs}[ins.a]=-${nRegs}[ins.b] end`)
   H(`  ${regionOf(Op.NOT)}[${Op.NOT}]=function(ins) ${nRegs}[ins.a]=not ${nRegs}[ins.b] end`)
   H(`  ${regionOf(Op.LEN)}[${Op.LEN}]=function(ins) ${nRegs}[ins.a]=#${nRegs}[ins.b] end`)
@@ -430,6 +444,7 @@ export function generateVM(rootProto: Proto, cfg: VMGenConfig): string {
     `    if res[1]~=nil then`,
     `      ${nRegs}[ins.a+2]=res[1]`,
     `      for i=1,ins.c do ${nRegs}[ins.a+2+i]=res[i] end`,
+    `    else`,
     `      ${nPC}=${nPC}+ins.sbx`,
     `    end`,
     `  end`
