@@ -21,7 +21,7 @@ class FuncCompiler {
   proto: Proto
   locals: Local[] = []
   regTop: number = 0
-  private scopeStack: number[] = []
+  private scopeStack: Array<{ locals: number; regTop: number }> = []
   private loopStack: LoopInfo[] = []
   private parent: FuncCompiler | null
   private protoCounter: number
@@ -56,6 +56,13 @@ class FuncCompiler {
   }
 
   freeRegs(n: number) { this.regTop -= n }
+
+  getRegTop(): number { return this.regTop }
+
+  setRegTop(top: number) {
+    this.regTop = top
+    if (this.regTop > this.proto.maxStack) this.proto.maxStack = this.regTop
+  }
 
   addConst(c: Constant): number {
     const k = this.proto.constants
@@ -99,13 +106,15 @@ class FuncCompiler {
     )
   }
 
-  pushScope() { this.scopeStack.push(this.locals.length) }
+  pushScope() {
+    this.scopeStack.push({ locals: this.locals.length, regTop: this.regTop })
+  }
 
   popScope() {
-    const base = this.scopeStack.pop()!
-    const removed = this.locals.length - base
+    const scope = this.scopeStack.pop()!
+    const removed = this.locals.length - scope.locals
     for (let i = 0; i < removed; i++) this.locals.pop()
-    this.regTop = this.locals.length > 0 ? this.locals[this.locals.length - 1].reg + 1 : this.proto.params
+    this.regTop = scope.regTop
   }
 
   defineLocal(name: string): number {
@@ -385,8 +394,10 @@ export class Compiler {
     fc.popScope()
 
     const loopPc = fc.emitASBx(Op.FORLOOP, base, 0)
-    fc.patchJump(loopPc, loopStart - 1)
-    fc.patchJump(prepPc, fc.currentPc() - 1)
+    // FORPREP positions the counter, then FORLOOP performs the first
+    // increment/check and publishes the loop variable before the body.
+    fc.patchJump(loopPc, loopStart)
+    fc.patchJump(prepPc, loopPc)
 
     const exitPc = fc.currentPc()
     for (const p of loopInfo.breakPatches) fc.patchJump(p, exitPc)
@@ -397,7 +408,27 @@ export class Compiler {
   private compileGenFor(stmt: AST.GenericFor, fc: FuncCompiler) {
     const base = fc.reserveRegs(3 + stmt.names.length)
     for (let i = 0; i < stmt.iterators.length && i < 3; i++) {
-      this.compileExprTo(stmt.iterators[i], fc, base + i)
+      const iterator = stmt.iterators[i]
+      if (i === 0 && iterator.kind === "CallExpression") {
+        // Generic-for initialization consumes all three returns from the
+        // iterator factory (for example ipairs/pairs): iterator, state, key.
+        // A normal expression call only keeps one return value.
+        const loopTop = fc.getRegTop()
+        const callee = this.compileExpr(iterator.callee, fc, base)
+        if (callee !== base) fc.emitABC(Op.MOVE, base, callee, 0)
+        fc.setRegTop(loopTop)
+        const frameTop = Math.max(loopTop, base + iterator.args.length + 1)
+        fc.setRegTop(frameTop)
+        for (let j = 0; j < iterator.args.length; j++) {
+          const argReg = base + j + 1
+          this.compileExprTo(iterator.args[j], fc, argReg)
+          fc.setRegTop(frameTop)
+        }
+        fc.emitABC(Op.CALL, base, iterator.args.length + 1, 4)
+        fc.setRegTop(loopTop)
+      } else {
+        this.compileExprTo(iterator, fc, base + i)
+      }
     }
 
     const loopStart = fc.currentPc()
@@ -560,29 +591,43 @@ export class Compiler {
 
       case "CallExpression": {
         const r = dst < 0 ? fc.allocReg() : dst
+
+        // CALL uses a contiguous frame: callee at A and arguments at A+1...
+        // Nested expressions may need scratch registers, so reserve the whole
+        // frame first and discard only those scratch registers after each arg.
+        const resultTop = fc.getRegTop()
         const callee = this.compileExpr(expr.callee, fc, r)
         if (callee !== r) fc.emitABC(Op.MOVE, r, callee, 0)
+        fc.setRegTop(resultTop)
+        const frameTop = Math.max(resultTop, r + expr.args.length + 1)
+        fc.setRegTop(frameTop)
         for (let i = 0; i < expr.args.length; i++) {
-          const ar = fc.allocReg()
+          const ar = r + i + 1
           this.compileExprTo(expr.args[i], fc, ar)
+          fc.setRegTop(frameTop)
         }
         fc.emitABC(Op.CALL, r, expr.args.length + 1, 2)
-        fc.freeRegs(expr.args.length)
+        fc.setRegTop(resultTop)
         return r
       }
 
       case "MethodCallExpression": {
         const r = dst < 0 ? fc.allocReg() : dst
+        const resultTop = fc.getRegTop()
         const obj = this.compileExpr(expr.object, fc, r)
         if (obj !== r) fc.emitABC(Op.MOVE, r, obj, 0)
+        fc.setRegTop(resultTop)
         const k = fc.addConst(constStr(expr.method.name))
         fc.emitABC(Op.SELF, r, r, k)
+        const frameTop = Math.max(resultTop, r + expr.args.length + 2)
+        fc.setRegTop(frameTop)
         for (let i = 0; i < expr.args.length; i++) {
-          const ar = fc.allocReg()
+          const ar = r + i + 2
           this.compileExprTo(expr.args[i], fc, ar)
+          fc.setRegTop(frameTop)
         }
         fc.emitABC(Op.CALL, r, expr.args.length + 2, 2)
-        fc.freeRegs(expr.args.length)
+        fc.setRegTop(resultTop)
         return r
       }
 
@@ -603,10 +648,11 @@ export class Compiler {
         for (const field of expr.fields) {
           if (field.kind === "TableField") {
             const val = fc.allocReg()
+            const idx = fc.allocReg()
             this.compileExprTo(field.value, fc, val)
-            fc.emitABx(Op.LOADINT, val + 1, fc.addConst(constNum(arrIdx++)))
-            fc.emitABC(Op.SETTABLE, r, val + 1, val)
-            fc.freeReg(); fc.freeReg()
+            fc.emitABx(Op.LOADINT, idx, fc.addConst(constNum(arrIdx++)))
+            fc.emitABC(Op.SETTABLE, r, idx, val)
+            fc.freeRegs(2)
           } else if (field.kind === "TableKeyString") {
             const k = fc.addConst(constStr(field.key.name))
             const val = fc.allocReg()
