@@ -28,8 +28,8 @@ function encryptBytecode(data: number[], seed: number): { blob: number[]; key: n
   }
   let checksum = 0x811C9DC5 >>> 0
   for (const b of data) {
-    checksum = Math.imul(checksum, 0x01000193) >>> 0
-    checksum = (checksum ^ b) >>> 0
+    // lrotate left 7, then XOR — no 32-bit multiply = no float64 precision drift
+    checksum = (((checksum << 7) | (checksum >>> 25)) ^ b) >>> 0
   }
   checksum = (checksum ^ ((seed ^ 0xCAFEBABE) >>> 0)) >>> 0
   return { blob, key: seed & 0xFF, checksum }
@@ -249,10 +249,10 @@ export function generateVM(rootProto: Proto, cfg: VMGenConfig): string {
   // 16777619 = 256*65536 + 403; each step < 2^40 < 2^53
   L(`local ${nChkVar}=2166136261`)
   L(`for _,${nV} in ipairs(${nRaw}) do`)
-  L(`  ${nChkVar}=bit32.bxor((${nChkVar}*256%4294967296*65536%4294967296+${nChkVar}*403%4294967296)%4294967296,${nV})`)
+  L(`  ${nChkVar}=bit32.bxor(bit32.lrotate(${nChkVar},7),${nV})`)
   L(`end`)
   L(`${nChkVar}=bit32.bxor(${nChkVar},${((cfg.seed ^ 0xCAFEBABE) >>> 0)})%4294967296`)
-  L(`if ${nChkVar}~=${checksum >>> 0} then error("CHK:got="..tostring(${nChkVar})..",want=${checksum >>> 0}",0) end`)
+  L(`if ${nChkVar}~=${checksum >>> 0} then error("",0) end`)
 
   // ====== DESERIALIZER ======
   const nPos2 = N()
