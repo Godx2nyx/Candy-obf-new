@@ -163,7 +163,7 @@ export function generateVM(rootProto: Proto, cfg: VMGenConfig): string {
   const out: string[] = []
   const L = (...lines: string[]) => lines.forEach(l => out.push(l))
 
-  L(`-- zisuay Team`)
+  L(`-- zis luau obfuscate Premium v0.1`)
 
   // ====== ANTI-EMU GUARD (DEBUG) ======
   const dispEntries = dispTblKeys.map((k,i)=>`[${k}]=${dispTblVals[i]}`).join(',')
@@ -252,7 +252,7 @@ export function generateVM(rootProto: Proto, cfg: VMGenConfig): string {
   L(`  ${nChkVar}=bit32.bxor((${nChkVar}*256%4294967296*65536%4294967296+${nChkVar}*403%4294967296)%4294967296,${nV})`)
   L(`end`)
   L(`${nChkVar}=bit32.bxor(${nChkVar},${((cfg.seed ^ 0xCAFEBABE) >>> 0)})%4294967296`)
-  L(`if ${nChkVar}~=${checksum >>> 0} then error("",0) end`)
+  L(`if ${nChkVar}~=${checksum >>> 0} then error("CHK:got="..tostring(${nChkVar})..",want=${checksum >>> 0}",0) end`)
 
   // ====== DESERIALIZER ======
   const nPos2 = N()
@@ -502,11 +502,7 @@ export function generateVM(rootProto: Proto, cfg: VMGenConfig): string {
   L(`    end`)
   L(`    return ${nRawGame}[k]`)
   L(`  end,`)
-  L(`  __newindex=function(t,k,v) ${nRawGame}[k]=v end,`)
-  L(`  __namecall=function(t,...)`)
-  L(`    local m=table.remove({...},1)`)
-  L(`    return (${nGameProxy}[m])(t,...)`)
-  L(`  end`)
+  L(`  __newindex=function(t,k,v) ${nRawGame}[k]=v end`)
   L(`})`)
   L(`local function ${nStage1}()`)
   L(`  local _base=_ENV or getfenv()`)
