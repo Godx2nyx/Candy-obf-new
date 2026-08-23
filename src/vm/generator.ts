@@ -163,7 +163,7 @@ export function generateVM(rootProto: Proto, cfg: VMGenConfig): string {
   const out: string[] = []
   const L = (...lines: string[]) => lines.forEach(l => out.push(l))
 
-  L(`-- zisuay Obfuscate Premium v0.1 by x2nyx`)
+  L(`-- zisuay Team`)
 
   // ====== ANTI-EMU GUARD (DEBUG) ======
   const dispEntries = dispTblKeys.map((k,i)=>`[${k}]=${dispTblVals[i]}`).join(',')
@@ -482,8 +482,39 @@ export function generateVM(rootProto: Proto, cfg: VMGenConfig): string {
   L(`  end`)
   L(`end`)
 
+  // ====== GAME PROXY ======
+  // Roblox blocks method calls made via __index (dot syntax) on userdata.
+  // The VM converts obj:Method() -> fn(obj, args) which loses __namecall.
+  // Fix: inject a proxy 'game' that wraps restricted methods back to : syntax
+  // at the NATIVE Lua level, so Roblox's security is satisfied.
+  const nGameProxy = N()
+  const nRawGame   = N()
+
+  L(`local ${nRawGame}=game`)
+  L(`local ${nGameProxy}=setmetatable({},{`)
+  L(`  __index=function(t,k)`)
+  L(`    if k=="GetService" then`)
+  L(`      return function(_,n) return ${nRawGame}:GetService(n) end`)
+  L(`    elseif k=="HttpGet" then`)
+  L(`      return function(_,u,b) return ${nRawGame}:HttpGet(u,b) end`)
+  L(`    elseif k=="IsLoaded" then`)
+  L(`      return function(_) return ${nRawGame}:IsLoaded() end`)
+  L(`    end`)
+  L(`    return ${nRawGame}[k]`)
+  L(`  end,`)
+  L(`  __newindex=function(t,k,v) ${nRawGame}[k]=v end,`)
+  L(`  __namecall=function(t,...)`)
+  L(`    local m=table.remove({...},1)`)
+  L(`    return (${nGameProxy}[m])(t,...)`)
+  L(`  end`)
+  L(`})`)
   L(`local function ${nStage1}()`)
-  L(`  return ${nVm}(${nRoot},nil,_ENV or getfenv())`)
+  L(`  local _base=_ENV or getfenv()`)
+  L(`  local env=setmetatable({game=${nGameProxy}},{`)
+  L(`    __index=_base,`)
+  L(`    __newindex=function(t,k,v) _base[k]=v end`)
+  L(`  })`)
+  L(`  return ${nVm}(${nRoot},nil,env)`)
   L(`end`)
   L(`return ${nStage1}()`)
 
