@@ -1,21 +1,3 @@
-// ============================================================================
-// Hardened VM generator - defensive integrity edition
-// Generated helper rules are deterministic and build-time only.
-// ============================================================================
-
-/* ============================================================================
- * DEFENSIVE INTEGRITY HARDENING
- *
- * Purpose:
- *   - Validate the compiler/VM boundary before generation.
- *   - Detect malformed/tampered Proto structures deterministically.
- *   - Produce a per-build integrity fingerprint used by the wrapper.
- *
- * This is defensive hardening only. It does not inspect debuggers, hide code
- * from security products, bypass platform controls, or implement anti-analysis
- * evasion.
- * ========================================================================== */
-
 interface IntegrityReport {
   ok: boolean;
   nodes: number;
