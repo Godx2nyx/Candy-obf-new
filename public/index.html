@@ -105,16 +105,8 @@ footer{position:relative;z-index:1;border-top:1px solid var(--border);padding:2r
       <button class="toggle" id="tog-minify" onclick="toggleOpt(this)"><span class="dot"></span> Minify</button>
     </div>
     <div class="sep"></div>
-    <span class="opt-label">MODE</span>
-    <select class="select-styled" id="sel-vmtype">
-      <option value="register">Standard</option>
-      <option value="none">Direct</option>
-    </select>
-    <select class="select-styled" id="sel-vmlevel">
-      <option value="max">Max</option>
-      <option value="normal">Normal</option>
-      <option value="debug">Debug</option>
-    </select>
+    <span class="opt-label">VM</span>
+    <span class="status-pill success" id="vm-version">New VM</span>
   </div>
 
   <div class="editor-grid">
@@ -172,13 +164,24 @@ footer{position:relative;z-index:1;border-top:1px solid var(--border);padding:2r
 <script>
 function toggleOpt(el){el.classList.toggle('on')}
 
+function randomSeed(){
+  // Keep the seed in the unsigned 32-bit range expected by the new VM generator.
+  if(window.crypto && crypto.getRandomValues){
+    const buf=new Uint32Array(1)
+    crypto.getRandomValues(buf)
+    return buf[0]
+  }
+  return Math.floor(Math.random()*0x100000000) >>> 0
+}
+
 function getOpts(){
   return {
     rename:document.getElementById('tog-rename').classList.contains('on'),
     encodeStrings:document.getElementById('tog-strings').classList.contains('on'),
     minify:document.getElementById('tog-minify').classList.contains('on'),
-    vmType:document.getElementById('sel-vmtype').value,
-    vmLevel:document.getElementById('sel-vmlevel').value
+    // New VM generator accepts seed/minify; keep the API explicit about the VM version.
+    vmVersion:'new',
+    seed:randomSeed()
   }
 }
 
@@ -249,12 +252,24 @@ function copyOutput(){
   navigator.clipboard.writeText(out).then(()=>showToast('Copied!')).catch(()=>showToast('Copy failed'))
 }
 
+function randomDigits(length){
+  let out=''
+  if(window.crypto && crypto.getRandomValues){
+    const buf=new Uint32Array(length)
+    crypto.getRandomValues(buf)
+    for(let i=0;i<length;i++) out += String(buf[i] % 10)
+  }else{
+    for(let i=0;i<length;i++) out += Math.floor(Math.random()*10)
+  }
+  return out
+}
+
 function downloadOutput(){
   const out=document.getElementById('output-code').textContent
   if(!out || out.startsWith('-- Output will appear')){showToast('Nothing to download');return}
   const a=document.createElement('a')
   a.href=URL.createObjectURL(new Blob([out],{type:'text/plain;charset=utf-8'}))
-  a.download='output.lua'
+  a.download='zis_obfuscator_'+randomDigits(10)+'.txt'
   a.click()
   URL.revokeObjectURL(a.href)
 }
