@@ -1,10 +1,10 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8"/>
-<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>Lua Studio — RegVM</title>
-<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Lua Studio — RegVM Max</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{--bg:#09090f;--surface:#111120;--surface2:#151529;--border:#24243d;--pink:#ff6fd8;--purple:#b06aff;--blue:#6a8fff;--green:#50dc78;--red:#ff5b6e;--text:#e8e8f0;--muted:#777795}
@@ -13,27 +13,31 @@ body:before{content:"";position:fixed;inset:0;background-image:linear-gradient(r
 .orb{position:fixed;border-radius:50%;filter:blur(100px);opacity:.14;pointer-events:none}.o1{width:600px;height:600px;background:var(--purple);top:-220px;left:-160px}.o2{width:500px;height:500px;background:var(--pink);right:-140px;bottom:-180px}
 nav{position:fixed;z-index:20;top:0;left:0;right:0;height:60px;padding:0 2rem;display:flex;align-items:center;justify-content:space-between;background:rgba(9,9,15,.76);backdrop-filter:blur(20px);border-bottom:1px solid var(--border)}
 .logo{font:700 1.2rem "Space Grotesk";background:linear-gradient(135deg,var(--pink),var(--purple));-webkit-background-clip:text;color:transparent}
-.navlinks{display:flex;gap:1.3rem;align-items:center}.navlinks a{color:var(--muted);text-decoration:none;font-size:.82rem}.navlinks a:hover{color:var(--text)}
+.navlinks{display:flex;gap:.8rem;align-items:center}.navlinks a{color:var(--muted);text-decoration:none;font-size:.82rem}
 main{position:relative;z-index:1}.hero{min-height:58vh;padding:110px 2rem 55px;text-align:center;display:flex;flex-direction:column;align-items:center;justify-content:center}
 .badge{font:500 .7rem "JetBrains Mono";color:var(--pink);border:1px solid rgba(255,111,216,.3);background:rgba(255,111,216,.06);border-radius:99px;padding:.4rem .9rem;margin-bottom:1.4rem}
 h1{font:700 clamp(3rem,8vw,5.8rem)/1 "Space Grotesk";letter-spacing:-.05em}.grad{background:linear-gradient(135deg,var(--pink),var(--purple),var(--blue));-webkit-background-clip:text;color:transparent}
-.hero p{max-width:620px;color:var(--muted);line-height:1.7;margin:1.2rem 0 1.7rem}.cta{display:flex;gap:.7rem;flex-wrap:wrap;justify-content:center}
+.hero p{max-width:680px;color:var(--muted);line-height:1.7;margin:1.2rem 0 1.7rem}.cta{display:flex;gap:.7rem;flex-wrap:wrap;justify-content:center}
 .btn{border:0;border-radius:10px;padding:.75rem 1.25rem;font:600 .88rem "Space Grotesk";cursor:pointer;text-decoration:none}.primary{color:#fff;background:linear-gradient(135deg,var(--pink),var(--purple));box-shadow:0 0 25px rgba(176,106,255,.28)}.ghost{color:var(--text);background:transparent;border:1px solid var(--border)}
 .workspace{max-width:1250px;margin:auto;padding:0 1.5rem 6rem}.heading{text-align:center;margin-bottom:2rem}.heading h2{font:700 1.9rem "Space Grotesk"}.heading p{color:var(--muted);font-size:.85rem;margin-top:.45rem}
 .panel{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:1rem;margin-bottom:1rem}
 .panel-title{font:600 .72rem "JetBrains Mono";color:var(--muted);letter-spacing:.08em;margin-bottom:.8rem}
-.controls{display:grid;grid-template-columns:170px 1fr;gap:1rem;align-items:start}.control-group{display:flex;flex-wrap:wrap;gap:.5rem}.control-label{font-size:.75rem;color:var(--muted);padding-top:.45rem}
-select,.seed{width:100%;background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:7px;padding:.55rem .65rem;outline:none;font:500 .78rem Inter}select option{background:#151529}
-.feature-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:.55rem}.feature{padding:.55rem .65rem;border:1px solid var(--border);border-radius:8px;background:transparent;color:var(--muted);font-size:.73rem;cursor:pointer;text-align:left}.feature.on{border-color:var(--purple);color:var(--purple);background:rgba(176,106,255,.09)}.feature b{display:block;color:inherit;font-size:.76rem;margin-bottom:.15rem}.feature small{opacity:.7}
-.editors{display:grid;grid-template-columns:1fr 1fr;gap:1rem}.pane{background:var(--surface);border:1px solid var(--border);border-radius:14px;overflow:hidden;min-width:0}.ph{height:43px;padding:0 .9rem;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--border)}.pt{font:500 .72rem "JetBrains Mono";color:var(--muted)}.actions{display:flex;gap:.4rem}.mini{background:transparent;color:var(--muted);border:1px solid var(--border);border-radius:5px;padding:.25rem .5rem;font-size:.68rem;cursor:pointer}
+.maxbar{display:flex;align-items:center;justify-content:space-between;gap:1rem;padding:.8rem 1rem;border:1px solid rgba(176,106,255,.35);background:rgba(176,106,255,.07);border-radius:10px}
+.maxbar strong{font:600 .8rem "Space Grotesk"}.maxbar span{display:block;color:var(--muted);font-size:.68rem;margin-top:.2rem}
+.pill{color:var(--green);border:1px solid rgba(80,220,120,.35);padding:.35rem .65rem;border-radius:99px;font:600 .68rem "JetBrains Mono";white-space:nowrap}
+.feature-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:.55rem;margin-top:.8rem}
+.feature{padding:.65rem;border:1px solid rgba(176,106,255,.4);border-radius:8px;background:rgba(176,106,255,.08);color:var(--purple);text-align:left}
+.feature b{display:block;font-size:.74rem;margin-bottom:.15rem}.feature small{opacity:.7;font-size:.64rem}
+.editors{display:grid;grid-template-columns:1fr 1fr;gap:1rem}.pane{background:var(--surface);border:1px solid var(--border);border-radius:14px;overflow:hidden;min-width:0}
+.ph{height:43px;padding:0 .9rem;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--border)}.pt{font:500 .72rem "JetBrains Mono";color:var(--muted)}.actions{display:flex;gap:.4rem}.mini{background:transparent;color:var(--muted);border:1px solid var(--border);border-radius:5px;padding:.25rem .5rem;font-size:.68rem;cursor:pointer}
 textarea,.output{width:100%;height:430px;resize:none;background:transparent;border:0;outline:0;color:var(--text);padding:1rem;font:400 .78rem/1.7 "JetBrains Mono";overflow:auto}.output{color:#c29cff;white-space:pre-wrap;word-break:break-word}
 .bottom{display:flex;align-items:center;justify-content:center;gap:.8rem;margin-top:1rem}.process{padding:.85rem 2rem;font-size:.95rem;background:linear-gradient(135deg,var(--pink),var(--purple),var(--blue));color:#fff;border:0;border-radius:10px;font:700 .9rem "Space Grotesk";cursor:pointer}.process:disabled{opacity:.6;cursor:wait}
 .status{font:500 .7rem "JetBrains Mono";padding:.4rem .75rem;border:1px solid var(--border);border-radius:99px;color:var(--muted)}.status.ok{color:var(--green);border-color:rgba(80,220,120,.35)}.status.err{color:var(--red);border-color:rgba(255,91,110,.35)}
 .info{display:grid;grid-template-columns:repeat(4,1fr);gap:.7rem;margin-top:1rem}.info div{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:.8rem}.info strong{display:block;font:600 .75rem "Space Grotesk";margin-bottom:.2rem}.info span{font-size:.68rem;color:var(--muted)}
 .toast{position:fixed;right:1.5rem;bottom:1.5rem;z-index:50;background:var(--surface);border:1px solid var(--purple);color:var(--purple);padding:.65rem .9rem;border-radius:8px;font:500 .72rem "JetBrains Mono";opacity:0;transform:translateY(20px);transition:.25s}.toast.show{opacity:1;transform:none}
 footer{border-top:1px solid var(--border);padding:1.5rem 2rem;color:var(--muted);font-size:.7rem;display:flex;justify-content:space-between}
-@media(max-width:850px){.editors,.controls{grid-template-columns:1fr}.feature-grid{grid-template-columns:repeat(2,1fr)}.info{grid-template-columns:repeat(2,1fr)}.navlinks a:not(:last-child){display:none}}
-@media(max-width:500px){.feature-grid{grid-template-columns:1fr}.info{grid-template-columns:1fr}.workspace{padding-inline:1rem}}
+@media(max-width:850px){.editors{grid-template-columns:1fr}.feature-grid{grid-template-columns:repeat(2,1fr)}.info{grid-template-columns:repeat(2,1fr)}.navlinks a{display:none}}
+@media(max-width:500px){.feature-grid{grid-template-columns:1fr}.info{grid-template-columns:1fr}.workspace{padding-inline:1rem}.maxbar{align-items:flex-start;flex-direction:column}}
 </style>
 </head>
 <body>
@@ -43,40 +47,34 @@ footer{border-top:1px solid var(--border);padding:1.5rem 2rem;color:var(--muted)
   <div class="logo">Lua Studio</div>
   <div class="navlinks">
     <a href="#workspace">Workspace</a>
-    <a href="#options">VM Options</a>
     <a href="#workspace" class="btn primary" style="padding:.42rem .8rem">Start →</a>
   </div>
 </nav>
 
 <main>
 <section class="hero">
-  <div class="badge">REGVM GENERATOR • NEW VM</div>
+  <div class="badge">REGVM • MAX PRESET • ALL HARDENING</div>
   <h1><span class="grad">Lua Studio</span></h1>
-  <p>Process Lua source with the new register-based VM generator. Configure VM level, polymorphic seed, and supported hardening features from one workspace.</p>
-  <div class="cta"><a class="btn primary" href="#workspace">Open Workspace →</a><a class="btn ghost" href="#options">Configure VM</a></div>
+  <p>One-click RegVM generation. The UI no longer exposes VM level, feature switches, or seed controls. Every build is sent through the Max preset.</p>
+  <div class="cta"><a class="btn primary" href="#workspace">Open Workspace →</a></div>
 </section>
 
 <section class="workspace" id="workspace">
-  <div class="heading"><h2>RegVM Workspace</h2><p>Options are mapped to the new <b>generateRegVM()</b> API.</p></div>
+  <div class="heading"><h2>RegVM Max Workspace</h2><p>All generator-supported hardening is enabled automatically.</p></div>
 
-  <div class="panel" id="options">
-    <div class="panel-title">GENERATOR CONFIGURATION</div>
-    <div class="controls">
-      <div class="control-label">VM LEVEL</div>
-      <div><select id="level"><option value="debug">Debug</option><option value="normal" selected>Normal</option><option value="max">Max</option></select></div>
-
-      <div class="control-label">POLYMORPHIC SEED</div>
-      <div style="display:flex;gap:.5rem"><input class="seed" id="seed" type="text" inputmode="numeric" placeholder="Auto-generated"/><button class="mini" onclick="newSeed()">Random</button></div>
-
-      <div class="control-label">FEATURES</div>
-      <div class="feature-grid" id="feature-grid"></div>
+  <div class="panel">
+    <div class="panel-title">GENERATOR PRESET</div>
+    <div class="maxbar">
+      <div><strong>MAX / SINGLE CLICK</strong><span>level=max • executorGlobals=true • all RegFeatureFlag values forced</span></div>
+      <div class="pill">● ALL ON</div>
     </div>
+    <div class="feature-grid" id="feature-grid"></div>
   </div>
 
   <div class="editors">
     <div class="pane">
       <div class="ph"><span class="pt">input.lua</span><div class="actions"><button class="mini" onclick="sample()">Sample</button><button class="mini" onclick="clearInput()">Clear</button></div></div>
-      <textarea id="input" spellcheck="false" placeholder="-- Paste your Lua source here..."></textarea>
+      <textarea id="input" spellcheck="false" placeholder="-- Paste your Lua/Luau source here..."></textarea>
     </div>
     <div class="pane">
       <div class="ph"><span class="pt">output.lua</span><div class="actions"><button class="mini" onclick="copyOutput()">Copy</button><button class="mini" onclick="downloadOutput()">Download</button></div></div>
@@ -84,69 +82,48 @@ footer{border-top:1px solid var(--border);padding:1.5rem 2rem;color:var(--muted)
     </div>
   </div>
 
-  <div class="bottom"><button class="process" id="process" onclick="processLua()">Process with RegVM</button><span class="status" id="status">ready</span></div>
+  <div class="bottom">
+    <button class="process" id="process" onclick="processLua()">Generate Max RegVM</button>
+    <span class="status" id="status">ready</span>
+  </div>
 
   <div class="info">
-    <div><strong>Register VM</strong><span>RegBytecodeChunk based generator</span></div>
-    <div><strong>Integrity</strong><span>Preflight chunk validation enabled</span></div>
-    <div><strong>Polymorphic</strong><span>Seed-controlled generation</span></div>
-    <div><strong>Output</strong><span>Lua source ready to copy/download</span></div>
+    <div><strong>Register VM</strong><span>RegBytecodeChunk + generated VM runtime</span></div>
+    <div><strong>Max preset</strong><span>level=max with all public feature flags forced</span></div>
+    <div><strong>Polymorphic</strong><span>Fresh cryptographic seed generated server-side</span></div>
+    <div><strong>Output</strong><span>Generated Lua source ready to copy/download</span></div>
   </div>
 </section>
 </main>
 
-<footer><span>Lua Studio • RegVM</span><span>© 2026</span></footer>
+<footer><span>Lua Studio • RegVM Max</span><span>© 2026</span></footer>
 <div class="toast" id="toast"></div>
 
 <script>
 const FEATURE_META = [
-  ["opcodeShuffle","Opcode Shuffle","Remaps opcode dispatch"],
-  ["stringEncoding","String Encoding","Encodes string constants"],
-  ["constantFolding","Constant Folding","Folds supported constants"],
-  ["minification","Minification","Compacts generated output"],
-  ["fakeHandlers","Fake Handlers","Adds decoy handlers"],
-  ["handlerNoise","Handler Noise","Adds dispatch noise"],
-  ["antiDebug","Anti-Debug","Build/runtime hardening"],
-  ["antiTamper","Anti-Tamper","Integrity hardening"],
-  ["controlFlowFlattening","Control Flow","Flattens selected flow"],
-  ["opcodeFusion","Opcode Fusion","Fuses supported op pairs"],
-  ["deadCodeInjection","Dead Code","Injects inert code"],
-  ["syntaxInterpreter","Syntax Interpreter","Generated syntax layer"],
-  ["customCipher","Custom Cipher","Custom encoding layer"],
-  ["stubCompression","Stub Compression","Compresses VM stub"],
-  ["vmNesting","VM Nesting","Nested VM layer"]
+  ["opcodeShuffle","Opcode Shuffle","Opcode mapping"],
+  ["stringEncoding","String Encoding","Constant encoding"],
+  ["constantFolding","Constant Folding","Compiler-compatible flag"],
+  ["minification","Minification","Compact final output"],
+  ["fakeHandlers","Fake Handlers","Max state-machine decoys"],
+  ["handlerNoise","Handler Noise","Dispatch noise"],
+  ["antiDebug","Anti-Debug","Runtime hardening"],
+  ["antiTamper","Anti-Tamper","Integrity checks"],
+  ["controlFlowFlattening","Control Flow","Bytecode CFF"],
+  ["opcodeFusion","Opcode Fusion","Instruction fusion"],
+  ["deadCodeInjection","Dead Code","Generated inert fragments"],
+  ["syntaxInterpreter","Syntax Interpreter","Bootstrap syntax layer"],
+  ["customCipher","Custom Cipher","Seeded encoding/cipher layers"],
+  ["stubCompression","Stub Compression","Compressed/encrypted VM blob"],
+  ["vmNesting","VM Nesting","Max bootstrap/state wrapper"]
 ];
 
-const features = {};
-for (const [key,label,desc] of FEATURE_META) {
-  const el = document.createElement("button");
-  el.className = "feature";
-  el.innerHTML = `<b>${label}</b><small>${desc}</small>`;
-  el.onclick = () => { features[key] = !features[key]; el.classList.toggle("on", !!features[key]); };
-  document.getElementById("feature-grid").appendChild(el);
-  features[key] = false;
-}
-
-function newSeed(){
-  let n;
-  if (window.crypto?.getRandomValues) {
-    const a = new Uint32Array(1); crypto.getRandomValues(a); n = a[0];
-  } else n = Math.floor(Math.random()*0x100000000) >>> 0;
-  document.getElementById("seed").value = String(n >>> 0);
-}
-newSeed();
-
-function getOptions(){
-  const forceFeatures = Object.keys(features).filter(k => features[k]);
-  const level = document.getElementById("level").value;
-  const raw = document.getElementById("seed").value.trim();
-  const options = { level, forceFeatures };
-  if(raw !== ""){
-    const n = Number(raw);
-    if(!Number.isInteger(n) || n < -2147483648 || n > 4294967295) throw new Error("Invalid polymorphic seed");
-    options.polymorphicSeed = n;
-  }
-  return options;
+const featureGrid=document.getElementById("feature-grid");
+for(const [key,label,desc] of FEATURE_META){
+  const el=document.createElement("div");
+  el.className="feature";
+  el.innerHTML=`<b>✓ ${label}</b><small>${desc}</small>`;
+  featureGrid.appendChild(el);
 }
 
 function sample(){
@@ -159,57 +136,89 @@ end
 
 Players.PlayerAdded:Connect(greet)`;
 }
-function clearInput(){document.getElementById("input").value="";document.getElementById("output").textContent="-- Output will appear here...";setStatus("ready","")}
-function setStatus(text, cls){
-  const e=document.getElementById("status"); e.textContent=text; e.className="status"+(cls?" "+cls:"");
+function clearInput(){
+  document.getElementById("input").value="";
+  document.getElementById("output").textContent="-- Output will appear here...";
+  setStatus("ready","");
+}
+function setStatus(text,cls){
+  const e=document.getElementById("status");
+  e.textContent=text;
+  e.className="status"+(cls?" "+cls:"");
 }
 function toast(msg){
-  const e=document.getElementById("toast"); e.textContent=msg; e.classList.add("show");
-  clearTimeout(window.__toast); window.__toast=setTimeout(()=>e.classList.remove("show"),2200);
+  const e=document.getElementById("toast");
+  e.textContent=msg;
+  e.classList.add("show");
+  clearTimeout(window.__toast);
+  window.__toast=setTimeout(()=>e.classList.remove("show"),2200);
 }
 
 async function processLua(){
   const code=document.getElementById("input").value.trim();
   if(!code){toast("Paste Lua source first");return}
-  let options;
-  try{options=getOptions()}catch(e){toast(e.message);return}
+
+  // Deliberately fixed: the user cannot select a weaker mode from this UI.
+  const options={
+    preset:"max",
+    level:"max",
+    executorGlobals:true,
+    forceFeatures:FEATURE_META.map(x=>x[0])
+  };
 
   const btn=document.getElementById("process");
-  btn.disabled=true; setStatus("processing","");
+  btn.disabled=true;
+  setStatus("processing","");
+
   try{
     const response=await fetch("/api/obfuscate",{
       method:"POST",
       headers:{"Content-Type":"application/json"},
       body:JSON.stringify({code,options})
     });
+
     let data;
-    try{data=await response.json()}catch{throw new Error("Server returned invalid JSON")}
+    try{data=await response.json()}catch{
+      throw new Error("Server returned invalid JSON");
+    }
+
     if(!response.ok || !data.ok){
-      const msg=data.error || (Array.isArray(data.errors)?data.errors.map(x=>x.message||String(x)).join("\n"):"Processing failed");
+      const msg=data.error ||
+        (Array.isArray(data.errors)
+          ? data.errors.map(x=>x.message||String(x)).join("\n")
+          : "Processing failed");
       throw new Error(msg);
     }
-    document.getElementById("output").textContent=data.output || "";
+
+    document.getElementById("output").textContent=data.output||"";
     setStatus("done","ok");
-    toast("RegVM processing complete");
+    toast("Max RegVM processing complete");
   }catch(e){
     console.error(e);
     document.getElementById("output").textContent="-- Processing failed\n-- "+e.message;
     setStatus("failed","err");
     toast(e.message);
-  }finally{btn.disabled=false}
+  }finally{
+    btn.disabled=false;
+  }
 }
 
 function copyOutput(){
   const text=document.getElementById("output").textContent;
   if(!text || text.startsWith("-- Output will")) return toast("Nothing to copy");
-  navigator.clipboard.writeText(text).then(()=>toast("Copied!")).catch(()=>toast("Copy failed"));
+  navigator.clipboard.writeText(text)
+    .then(()=>toast("Copied!"))
+    .catch(()=>toast("Copy failed"));
 }
 function downloadOutput(){
   const text=document.getElementById("output").textContent;
   if(!text || text.startsWith("-- Output will")) return toast("Nothing to download");
   const a=document.createElement("a");
-  a.href=URL.createObjectURL(new Blob([text],{type:"text/plain;charset=utf-8"}));
-  a.download="regvm_output_"+Date.now()+".lua"; a.click(); URL.revokeObjectURL(a.href);
+  const url=URL.createObjectURL(new Blob([text],{type:"text/plain;charset=utf-8"}));
+  a.href=url;
+  a.download="regvm_max_"+Date.now()+".lua";
+  a.click();
+  setTimeout(()=>URL.revokeObjectURL(url),1000);
 }
 </script>
 </body>
