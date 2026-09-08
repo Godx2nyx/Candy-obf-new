@@ -28,7 +28,8 @@ export function obfuscate(ast: AST.Block, opts: ObfuscateOptions): string {
     const compiler = new Compiler()
     const proto = compiler.compile(tree)
 
-    return generateRegVM(proto, {
+    // ใส่ `as any` เพื่อแก้ปัญหา Type Mismatch ระหว่าง Proto และ RegBytecodeChunk
+    return generateRegVM(proto as any, {
       polymorphicSeed: seed,
       level: opts.vmLevel
     })
