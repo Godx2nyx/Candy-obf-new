@@ -3745,7 +3745,7 @@ export function generateRegVM(chunk: RegBytecodeChunk, options: RegVMGenOptions 
       xorKey,
       invSbox,
       checksum,
-      chunkName: "Clyde",
+      chunkName: "zis",
       rng,
     });
     console.log(`[RegVM] Blob: final output = ${output.length} chars`);
@@ -3753,7 +3753,7 @@ export function generateRegVM(chunk: RegBytecodeChunk, options: RegVMGenOptions 
 
   if (!options._noWatermark) {
     const art = [
-      `Candy wl obf^^`,
+      `zis_obfuscator`,
     ];
     output = `--[[\n${art.join('\n')}\n]]\n` + output;
   }
