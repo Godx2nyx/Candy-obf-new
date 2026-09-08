@@ -3,314 +3,214 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>Lua Studio</title>
-<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+<title>Lua Studio — RegVM</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet"/>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-:root{--bg:#09090F;--surface:#111120;--border:#1E1E35;--pink:#FF6FD8;--purple:#B06AFF;--blue:#6A8FFF;--text:#E8E8F0;--muted:#6B6B88}
-html{scroll-behavior:smooth}
+:root{--bg:#09090f;--surface:#111120;--surface2:#151529;--border:#24243d;--pink:#ff6fd8;--purple:#b06aff;--blue:#6a8fff;--green:#50dc78;--red:#ff5b6e;--text:#e8e8f0;--muted:#777795}
 body{background:var(--bg);color:var(--text);font-family:Inter,sans-serif;min-height:100vh;overflow-x:hidden}
-body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(rgba(176,106,255,.04) 1px,transparent 1px),linear-gradient(90deg,rgba(176,106,255,.04) 1px,transparent 1px);background-size:40px 40px;pointer-events:none;z-index:0}
-.orb{position:fixed;border-radius:50%;filter:blur(100px);pointer-events:none;z-index:0;opacity:.18;animation:drift 12s ease-in-out infinite alternate}
-.orb-1{width:600px;height:600px;background:var(--purple);top:-200px;left:-150px}
-.orb-2{width:500px;height:500px;background:var(--pink);bottom:-150px;right:-100px;animation-delay:-6s}
-.orb-3{width:300px;height:300px;background:var(--blue);top:40%;left:40%;animation-delay:-3s;opacity:.1}
-@keyframes drift{from{transform:translate(0,0) scale(1)}to{transform:translate(30px,20px) scale(1.05)}}
-nav{position:fixed;top:0;left:0;right:0;z-index:100;display:flex;align-items:center;justify-content:space-between;padding:0 2rem;height:60px;background:rgba(9,9,15,.7);backdrop-filter:blur(20px);border-bottom:1px solid var(--border)}
-.nav-logo,.footer-logo{font-family:'Space Grotesk',sans-serif;font-weight:700;background:linear-gradient(135deg,var(--pink),var(--purple));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
-.nav-logo{font-size:1.2rem;letter-spacing:-.02em}
-.nav-links{display:flex;gap:1.5rem;align-items:center}
-.nav-links a{color:var(--muted);text-decoration:none;font-size:.85rem;font-weight:500;transition:color .2s}
-.nav-links a:hover{color:var(--text)}
-.hero{position:relative;z-index:1;min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:80px 2rem 2rem;text-align:center}
-.hero-eyebrow{display:inline-flex;align-items:center;gap:.5rem;font-family:'JetBrains Mono',monospace;font-size:.72rem;color:var(--pink);letter-spacing:.12em;text-transform:uppercase;padding:.35rem .9rem;border:1px solid rgba(255,111,216,.3);border-radius:99px;margin-bottom:2rem;background:rgba(255,111,216,.06)}
-.hero-eyebrow::before{content:'';width:6px;height:6px;background:var(--pink);border-radius:50%;animation:pulse 2s ease infinite}
-@keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.4;transform:scale(.7)}}
-.hero h1{font-family:'Space Grotesk',sans-serif;font-size:clamp(3rem,8vw,6rem);font-weight:700;line-height:1;letter-spacing:-.04em;margin-bottom:1.5rem}
-.hero h1 .grad{background:linear-gradient(135deg,var(--pink),var(--purple),var(--blue));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
-.hero p{max-width:480px;color:var(--muted);font-size:1.05rem;line-height:1.7;margin-bottom:2.5rem}
-.hero-cta{display:flex;gap:1rem;flex-wrap:wrap;justify-content:center;margin-bottom:4rem}
-.btn-primary,.btn-ghost{display:inline-flex;align-items:center;gap:.5rem;padding:.75rem 1.75rem;font-family:'Space Grotesk',sans-serif;font-weight:600;font-size:.95rem;border-radius:10px;cursor:pointer;text-decoration:none}
-.btn-primary{background:linear-gradient(135deg,var(--pink),var(--purple));color:#fff;border:none;box-shadow:0 0 24px rgba(176,106,255,.4)}
-.btn-ghost{background:transparent;color:var(--text);border:1px solid var(--border)}
-.stats{display:flex;gap:3rem;flex-wrap:wrap;justify-content:center}
-.stat{text-align:center}.stat-num{font-family:'Space Grotesk',sans-serif;font-size:1.6rem;font-weight:700;background:linear-gradient(135deg,var(--pink),var(--purple));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}.stat-label{font-size:.78rem;color:var(--muted);margin-top:.2rem}
-.editor-section{position:relative;z-index:1;padding:0 2rem 6rem;max-width:1200px;margin:0 auto}
-.editor-section h2,.features h2{font-family:'Space Grotesk',sans-serif;font-weight:700;text-align:center;letter-spacing:-.02em}
-.editor-section h2{font-size:1.8rem;margin-bottom:.5rem}.editor-section .sub,.features .sub{text-align:center;color:var(--muted);margin-bottom:2.5rem;font-size:.9rem}
-.options-bar{display:flex;gap:1rem;flex-wrap:wrap;align-items:center;margin-bottom:1.25rem;padding:1rem 1.25rem;background:var(--surface);border:1px solid var(--border);border-radius:12px}
-.opt-label{font-size:.75rem;font-family:'JetBrains Mono',monospace;color:var(--muted);margin-right:.25rem}
-.toggle-group{display:flex;gap:.5rem;flex-wrap:wrap;align-items:center}
-.toggle{display:flex;align-items:center;gap:.4rem;font-size:.8rem;color:var(--muted);cursor:pointer;user-select:none;padding:.3rem .7rem;border:1px solid var(--border);border-radius:6px;background:transparent;font-family:Inter,sans-serif}
-.toggle.on{background:rgba(176,106,255,.12);border-color:var(--purple);color:var(--purple)}
-.toggle .dot{width:8px;height:8px;border-radius:50%;background:var(--border)}.toggle.on .dot{background:var(--purple)}
-.sep{width:1px;height:24px;background:var(--border)}
-.select-styled{background:transparent;border:1px solid var(--border);color:var(--text);font-size:.8rem;padding:.3rem .6rem;border-radius:6px;font-family:Inter,sans-serif;cursor:pointer;outline:none}.select-styled option{background:#1a1a2e}
-.editor-grid{display:grid;grid-template-columns:1fr 1fr;gap:1rem}
-.editor-pane{display:flex;flex-direction:column;background:var(--surface);border:1px solid var(--border);border-radius:14px;overflow:hidden;transition:border-color .3s,box-shadow .3s;position:relative}
-.editor-pane.active-glow{border-color:rgba(176,106,255,.5);box-shadow:0 0 0 1px rgba(176,106,255,.15),0 0 40px rgba(176,106,255,.12)}
-.pane-header{display:flex;align-items:center;justify-content:space-between;padding:.65rem 1rem;border-bottom:1px solid var(--border);background:rgba(0,0,0,.2)}
-.pane-title{font-family:'JetBrains Mono',monospace;font-size:.72rem;color:var(--muted);display:flex;align-items:center;gap:.5rem}.pane-dot{width:8px;height:8px;border-radius:50%}.dot-pink{background:var(--pink)}.dot-purple{background:var(--purple)}
-.pane-actions{display:flex;gap:.5rem}.pane-btn{font-size:.7rem;padding:.2rem .55rem;border:1px solid var(--border);border-radius:5px;background:transparent;color:var(--muted);cursor:pointer;font-family:Inter,sans-serif}
-textarea,.output-area{flex:1;min-height:380px;background:transparent;border:none;outline:none;resize:none;font-family:'JetBrains Mono',monospace;font-size:.82rem;line-height:1.7;color:var(--text);padding:1rem 1.25rem;tab-size:2}
-textarea::placeholder{color:var(--muted)}.output-area{white-space:pre-wrap;word-break:break-all;overflow:auto;color:rgba(176,106,255,.9)}
-.obf-row{display:flex;justify-content:center;align-items:center;gap:1rem;margin-top:1.25rem}
-.btn-obf{display:inline-flex;align-items:center;gap:.6rem;padding:.85rem 2.5rem;background:linear-gradient(135deg,var(--pink),var(--purple),var(--blue));background-size:200% 200%;color:#fff;font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:1rem;border:none;border-radius:12px;cursor:pointer;animation:gradShift 4s ease infinite;box-shadow:0 0 32px rgba(176,106,255,.5)}
-@keyframes gradShift{0%,100%{background-position:0 50%}50%{background-position:100% 50%}}
-.btn-obf:disabled{opacity:.7;cursor:wait}.spinner{display:none;width:16px;height:16px;border:2px solid rgba(255,255,255,.3);border-top-color:#fff;border-radius:50%;animation:spin .7s linear infinite}@keyframes spin{to{transform:rotate(360deg)}}.loading .spinner{display:block}.loading .btn-icon{display:none}
-.status-pill{font-size:.75rem;font-family:'JetBrains Mono',monospace;padding:.3rem .75rem;border-radius:99px;border:1px solid var(--border);color:var(--muted)}.status-pill.success{border-color:rgba(80,220,120,.4);color:#50dc78;background:rgba(80,220,120,.07)}.status-pill.error{border-color:rgba(255,80,80,.4);color:#ff5050;background:rgba(255,80,80,.07)}
-.features{position:relative;z-index:1;max-width:1100px;margin:0 auto;padding:0 2rem 6rem}.features h2{font-size:2rem;margin-bottom:.5rem}.features .sub{margin-bottom:3rem}.feat-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:1rem}.feat-card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:1.5rem}.feat-icon{font-size:1.6rem;margin-bottom:1rem;display:block}.feat-card h3{font-family:'Space Grotesk',sans-serif;font-size:.95rem;font-weight:600;margin-bottom:.5rem}.feat-card p{font-size:.82rem;color:var(--muted);line-height:1.65}
-footer{position:relative;z-index:1;border-top:1px solid var(--border);padding:2rem;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:1rem}.footer-logo{font-size:1rem}footer p{font-size:.78rem;color:var(--muted)}
-#particles{position:fixed;inset:0;pointer-events:none;z-index:200}.particle{position:absolute;width:6px;height:6px;border-radius:50%;pointer-events:none;animation:particleAnim .8s ease-out forwards}@keyframes particleAnim{0%{opacity:1;transform:scale(1) translate(0,0)}100%{opacity:0;transform:scale(0) translate(var(--dx),var(--dy))}}
-.toast{position:fixed;bottom:2rem;right:2rem;z-index:300;font-family:'JetBrains Mono',monospace;font-size:.78rem;padding:.6rem 1rem;background:var(--surface);border:1px solid var(--purple);border-radius:8px;color:var(--purple);transform:translateY(80px);opacity:0;transition:all .3s}.toast.show{transform:translateY(0);opacity:1}
-@media(max-width:768px){.editor-grid,.feat-grid{grid-template-columns:1fr}.stats{gap:1.5rem}.options-bar{gap:.6rem}.sep{display:none}.nav-links{gap:.8rem}.nav-links a{font-size:.75rem}}
+body:before{content:"";position:fixed;inset:0;background-image:linear-gradient(rgba(176,106,255,.035) 1px,transparent 1px),linear-gradient(90deg,rgba(176,106,255,.035) 1px,transparent 1px);background-size:40px 40px;pointer-events:none}
+.orb{position:fixed;border-radius:50%;filter:blur(100px);opacity:.14;pointer-events:none}.o1{width:600px;height:600px;background:var(--purple);top:-220px;left:-160px}.o2{width:500px;height:500px;background:var(--pink);right:-140px;bottom:-180px}
+nav{position:fixed;z-index:20;top:0;left:0;right:0;height:60px;padding:0 2rem;display:flex;align-items:center;justify-content:space-between;background:rgba(9,9,15,.76);backdrop-filter:blur(20px);border-bottom:1px solid var(--border)}
+.logo{font:700 1.2rem "Space Grotesk";background:linear-gradient(135deg,var(--pink),var(--purple));-webkit-background-clip:text;color:transparent}
+.navlinks{display:flex;gap:1.3rem;align-items:center}.navlinks a{color:var(--muted);text-decoration:none;font-size:.82rem}.navlinks a:hover{color:var(--text)}
+main{position:relative;z-index:1}.hero{min-height:58vh;padding:110px 2rem 55px;text-align:center;display:flex;flex-direction:column;align-items:center;justify-content:center}
+.badge{font:500 .7rem "JetBrains Mono";color:var(--pink);border:1px solid rgba(255,111,216,.3);background:rgba(255,111,216,.06);border-radius:99px;padding:.4rem .9rem;margin-bottom:1.4rem}
+h1{font:700 clamp(3rem,8vw,5.8rem)/1 "Space Grotesk";letter-spacing:-.05em}.grad{background:linear-gradient(135deg,var(--pink),var(--purple),var(--blue));-webkit-background-clip:text;color:transparent}
+.hero p{max-width:620px;color:var(--muted);line-height:1.7;margin:1.2rem 0 1.7rem}.cta{display:flex;gap:.7rem;flex-wrap:wrap;justify-content:center}
+.btn{border:0;border-radius:10px;padding:.75rem 1.25rem;font:600 .88rem "Space Grotesk";cursor:pointer;text-decoration:none}.primary{color:#fff;background:linear-gradient(135deg,var(--pink),var(--purple));box-shadow:0 0 25px rgba(176,106,255,.28)}.ghost{color:var(--text);background:transparent;border:1px solid var(--border)}
+.workspace{max-width:1250px;margin:auto;padding:0 1.5rem 6rem}.heading{text-align:center;margin-bottom:2rem}.heading h2{font:700 1.9rem "Space Grotesk"}.heading p{color:var(--muted);font-size:.85rem;margin-top:.45rem}
+.panel{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:1rem;margin-bottom:1rem}
+.panel-title{font:600 .72rem "JetBrains Mono";color:var(--muted);letter-spacing:.08em;margin-bottom:.8rem}
+.controls{display:grid;grid-template-columns:170px 1fr;gap:1rem;align-items:start}.control-group{display:flex;flex-wrap:wrap;gap:.5rem}.control-label{font-size:.75rem;color:var(--muted);padding-top:.45rem}
+select,.seed{width:100%;background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:7px;padding:.55rem .65rem;outline:none;font:500 .78rem Inter}select option{background:#151529}
+.feature-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:.55rem}.feature{padding:.55rem .65rem;border:1px solid var(--border);border-radius:8px;background:transparent;color:var(--muted);font-size:.73rem;cursor:pointer;text-align:left}.feature.on{border-color:var(--purple);color:var(--purple);background:rgba(176,106,255,.09)}.feature b{display:block;color:inherit;font-size:.76rem;margin-bottom:.15rem}.feature small{opacity:.7}
+.editors{display:grid;grid-template-columns:1fr 1fr;gap:1rem}.pane{background:var(--surface);border:1px solid var(--border);border-radius:14px;overflow:hidden;min-width:0}.ph{height:43px;padding:0 .9rem;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--border)}.pt{font:500 .72rem "JetBrains Mono";color:var(--muted)}.actions{display:flex;gap:.4rem}.mini{background:transparent;color:var(--muted);border:1px solid var(--border);border-radius:5px;padding:.25rem .5rem;font-size:.68rem;cursor:pointer}
+textarea,.output{width:100%;height:430px;resize:none;background:transparent;border:0;outline:0;color:var(--text);padding:1rem;font:400 .78rem/1.7 "JetBrains Mono";overflow:auto}.output{color:#c29cff;white-space:pre-wrap;word-break:break-word}
+.bottom{display:flex;align-items:center;justify-content:center;gap:.8rem;margin-top:1rem}.process{padding:.85rem 2rem;font-size:.95rem;background:linear-gradient(135deg,var(--pink),var(--purple),var(--blue));color:#fff;border:0;border-radius:10px;font:700 .9rem "Space Grotesk";cursor:pointer}.process:disabled{opacity:.6;cursor:wait}
+.status{font:500 .7rem "JetBrains Mono";padding:.4rem .75rem;border:1px solid var(--border);border-radius:99px;color:var(--muted)}.status.ok{color:var(--green);border-color:rgba(80,220,120,.35)}.status.err{color:var(--red);border-color:rgba(255,91,110,.35)}
+.info{display:grid;grid-template-columns:repeat(4,1fr);gap:.7rem;margin-top:1rem}.info div{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:.8rem}.info strong{display:block;font:600 .75rem "Space Grotesk";margin-bottom:.2rem}.info span{font-size:.68rem;color:var(--muted)}
+.toast{position:fixed;right:1.5rem;bottom:1.5rem;z-index:50;background:var(--surface);border:1px solid var(--purple);color:var(--purple);padding:.65rem .9rem;border-radius:8px;font:500 .72rem "JetBrains Mono";opacity:0;transform:translateY(20px);transition:.25s}.toast.show{opacity:1;transform:none}
+footer{border-top:1px solid var(--border);padding:1.5rem 2rem;color:var(--muted);font-size:.7rem;display:flex;justify-content:space-between}
+@media(max-width:850px){.editors,.controls{grid-template-columns:1fr}.feature-grid{grid-template-columns:repeat(2,1fr)}.info{grid-template-columns:repeat(2,1fr)}.navlinks a:not(:last-child){display:none}}
+@media(max-width:500px){.feature-grid{grid-template-columns:1fr}.info{grid-template-columns:1fr}.workspace{padding-inline:1rem}}
 </style>
 </head>
 <body>
-<div class="orb orb-1"></div><div class="orb orb-2"></div><div class="orb orb-3"></div><canvas id="particles"></canvas>
+<div class="orb o1"></div><div class="orb o2"></div>
 
 <nav>
-  <span class="nav-logo">Lua Studio</span>
-  <div class="nav-links">
-    <a href="#editor">Editor</a>
-    <a href="#features">Workspace</a>
-    <a href="#editor" class="btn-primary" style="padding:.4rem 1rem;font-size:.82rem;">Start →</a>
+  <div class="logo">Lua Studio</div>
+  <div class="navlinks">
+    <a href="#workspace">Workspace</a>
+    <a href="#options">VM Options</a>
+    <a href="#workspace" class="btn primary" style="padding:.42rem .8rem">Start →</a>
   </div>
 </nav>
 
+<main>
 <section class="hero">
-  <div class="hero-eyebrow">Lua Processing Studio</div>
+  <div class="badge">REGVM GENERATOR • NEW VM</div>
   <h1><span class="grad">Lua Studio</span></h1>
-  <p>Process your Lua source through a clean, simple workspace.</p>
-  <div class="hero-cta">
-    <a href="#editor" class="btn-primary"><span>Open Editor</span><span>→</span></a>
-    <a href="#features" class="btn-ghost">View Workspace</a>
-  </div>
-  <div class="stats">
-    <div class="stat"><div class="stat-num">Ready</div><div class="stat-label">Processing workspace</div></div>
-    <div class="stat"><div class="stat-num">Fast</div><div class="stat-label">Simple workflow</div></div>
-    <div class="stat"><div class="stat-num">Clean</div><div class="stat-label">Output</div></div>
-  </div>
+  <p>Process Lua source with the new register-based VM generator. Configure VM level, polymorphic seed, and supported hardening features from one workspace.</p>
+  <div class="cta"><a class="btn primary" href="#workspace">Open Workspace →</a><a class="btn ghost" href="#options">Configure VM</a></div>
 </section>
 
-<section class="editor-section" id="editor">
-  <h2>Editor</h2>
-  <p class="sub">Paste your Lua code, choose options, and process it.</p>
+<section class="workspace" id="workspace">
+  <div class="heading"><h2>RegVM Workspace</h2><p>Options are mapped to the new <b>generateRegVM()</b> API.</p></div>
 
-  <div class="options-bar">
-    <span class="opt-label">OPTIONS</span>
-    <div class="toggle-group">
-      <button class="toggle on" id="tog-rename" onclick="toggleOpt(this)"><span class="dot"></span> Rename Variables</button>
-      <button class="toggle on" id="tog-strings" onclick="toggleOpt(this)"><span class="dot"></span> Process Strings</button>
-      <button class="toggle" id="tog-minify" onclick="toggleOpt(this)"><span class="dot"></span> Minify</button>
-    </div>
-    <div class="sep"></div>
-    <span class="opt-label">VM</span>
-    <span class="status-pill success" id="vm-version">New VM</span>
-  </div>
+  <div class="panel" id="options">
+    <div class="panel-title">GENERATOR CONFIGURATION</div>
+    <div class="controls">
+      <div class="control-label">VM LEVEL</div>
+      <div><select id="level"><option value="debug">Debug</option><option value="normal" selected>Normal</option><option value="max">Max</option></select></div>
 
-  <div class="editor-grid">
-    <div class="editor-pane" id="pane-in">
-      <div class="pane-header">
-        <div class="pane-title"><span class="pane-dot dot-pink"></span>input.lua</div>
-        <div class="pane-actions">
-          <button class="pane-btn" onclick="loadSample()">Sample</button>
-          <button class="pane-btn" onclick="clearInput()">Clear</button>
-        </div>
-      </div>
-      <textarea id="input-code" placeholder="-- Paste your Lua code here..." spellcheck="false"></textarea>
-    </div>
+      <div class="control-label">POLYMORPHIC SEED</div>
+      <div style="display:flex;gap:.5rem"><input class="seed" id="seed" type="text" inputmode="numeric" placeholder="Auto-generated"/><button class="mini" onclick="newSeed()">Random</button></div>
 
-    <div class="editor-pane" id="pane-out">
-      <div class="pane-header">
-        <div class="pane-title"><span class="pane-dot dot-purple"></span>output.lua</div>
-        <div class="pane-actions">
-          <button class="pane-btn" onclick="copyOutput()">Copy</button>
-          <button class="pane-btn" onclick="downloadOutput()">Download</button>
-        </div>
-      </div>
-      <div class="output-area" id="output-code">-- Output will appear here...</div>
+      <div class="control-label">FEATURES</div>
+      <div class="feature-grid" id="feature-grid"></div>
     </div>
   </div>
 
-  <div class="obf-row">
-    <button class="btn-obf" id="obf-btn" onclick="doObfuscate()">
-      <span class="btn-icon icon">●</span>
-      <span class="spinner"></span>
-      <span>Process</span>
-    </button>
-    <div class="status-pill" id="status-pill">ready</div>
+  <div class="editors">
+    <div class="pane">
+      <div class="ph"><span class="pt">input.lua</span><div class="actions"><button class="mini" onclick="sample()">Sample</button><button class="mini" onclick="clearInput()">Clear</button></div></div>
+      <textarea id="input" spellcheck="false" placeholder="-- Paste your Lua source here..."></textarea>
+    </div>
+    <div class="pane">
+      <div class="ph"><span class="pt">output.lua</span><div class="actions"><button class="mini" onclick="copyOutput()">Copy</button><button class="mini" onclick="downloadOutput()">Download</button></div></div>
+      <div class="output" id="output">-- Output will appear here...</div>
+    </div>
+  </div>
+
+  <div class="bottom"><button class="process" id="process" onclick="processLua()">Process with RegVM</button><span class="status" id="status">ready</span></div>
+
+  <div class="info">
+    <div><strong>Register VM</strong><span>RegBytecodeChunk based generator</span></div>
+    <div><strong>Integrity</strong><span>Preflight chunk validation enabled</span></div>
+    <div><strong>Polymorphic</strong><span>Seed-controlled generation</span></div>
+    <div><strong>Output</strong><span>Lua source ready to copy/download</span></div>
   </div>
 </section>
+</main>
 
-<section class="features" id="features">
-  <h2>Workspace</h2>
-  <p class="sub">A clean interface for processing Lua source.</p>
-  <div class="feat-grid">
-    <div class="feat-card"><span class="feat-icon">⚡</span><h3>Simple workflow</h3><p>Paste your source, choose the available options, and process it.</p></div>
-    <div class="feat-card"><span class="feat-icon">🧩</span><h3>Configurable</h3><p>Adjust the processing options from one place.</p></div>
-    <div class="feat-card"><span class="feat-icon">📄</span><h3>Output ready</h3><p>Copy or download the resulting Lua output when processing finishes.</p></div>
-  </div>
-</section>
-
-<footer>
-  <span class="footer-logo">Lua Studio</span>
-  <p>Processing workspace</p>
-  <p style="font-size:.72rem;">© 2026</p>
-</footer>
-
+<footer><span>Lua Studio • RegVM</span><span>© 2026</span></footer>
 <div class="toast" id="toast"></div>
 
 <script>
-function toggleOpt(el){el.classList.toggle('on')}
+const FEATURE_META = [
+  ["opcodeShuffle","Opcode Shuffle","Remaps opcode dispatch"],
+  ["stringEncoding","String Encoding","Encodes string constants"],
+  ["constantFolding","Constant Folding","Folds supported constants"],
+  ["minification","Minification","Compacts generated output"],
+  ["fakeHandlers","Fake Handlers","Adds decoy handlers"],
+  ["handlerNoise","Handler Noise","Adds dispatch noise"],
+  ["antiDebug","Anti-Debug","Build/runtime hardening"],
+  ["antiTamper","Anti-Tamper","Integrity hardening"],
+  ["controlFlowFlattening","Control Flow","Flattens selected flow"],
+  ["opcodeFusion","Opcode Fusion","Fuses supported op pairs"],
+  ["deadCodeInjection","Dead Code","Injects inert code"],
+  ["syntaxInterpreter","Syntax Interpreter","Generated syntax layer"],
+  ["customCipher","Custom Cipher","Custom encoding layer"],
+  ["stubCompression","Stub Compression","Compresses VM stub"],
+  ["vmNesting","VM Nesting","Nested VM layer"]
+];
 
-function randomSeed(){
-  // Keep the seed in the unsigned 32-bit range expected by the new VM generator.
-  if(window.crypto && crypto.getRandomValues){
-    const buf=new Uint32Array(1)
-    crypto.getRandomValues(buf)
-    return buf[0]
-  }
-  return Math.floor(Math.random()*0x100000000) >>> 0
+const features = {};
+for (const [key,label,desc] of FEATURE_META) {
+  const el = document.createElement("button");
+  el.className = "feature";
+  el.innerHTML = `<b>${label}</b><small>${desc}</small>`;
+  el.onclick = () => { features[key] = !features[key]; el.classList.toggle("on", !!features[key]); };
+  document.getElementById("feature-grid").appendChild(el);
+  features[key] = false;
 }
 
-function getOpts(){
-  return {
-    rename:document.getElementById('tog-rename').classList.contains('on'),
-    encodeStrings:document.getElementById('tog-strings').classList.contains('on'),
-    minify:document.getElementById('tog-minify').classList.contains('on'),
-    // New VM generator accepts seed/minify; keep the API explicit about the VM version.
-    vmVersion:'new',
-    seed:randomSeed()
+function newSeed(){
+  let n;
+  if (window.crypto?.getRandomValues) {
+    const a = new Uint32Array(1); crypto.getRandomValues(a); n = a[0];
+  } else n = Math.floor(Math.random()*0x100000000) >>> 0;
+  document.getElementById("seed").value = String(n >>> 0);
+}
+newSeed();
+
+function getOptions(){
+  const forceFeatures = Object.keys(features).filter(k => features[k]);
+  const level = document.getElementById("level").value;
+  const raw = document.getElementById("seed").value.trim();
+  const options = { level, forceFeatures };
+  if(raw !== ""){
+    const n = Number(raw);
+    if(!Number.isInteger(n) || n < -2147483648 || n > 4294967295) throw new Error("Invalid polymorphic seed");
+    options.polymorphicSeed = n;
   }
+  return options;
 }
 
-function loadSample(){
-  document.getElementById('input-code').value =
+function sample(){
+  document.getElementById("input").value =
 `local Players = game:GetService("Players")
+
 local function greet(player)
-  print("Hello, " .. player.Name)
+    print("Hello, " .. player.Name)
 end
-Players.PlayerAdded:Connect(greet)`
+
+Players.PlayerAdded:Connect(greet)`;
+}
+function clearInput(){document.getElementById("input").value="";document.getElementById("output").textContent="-- Output will appear here...";setStatus("ready","")}
+function setStatus(text, cls){
+  const e=document.getElementById("status"); e.textContent=text; e.className="status"+(cls?" "+cls:"");
+}
+function toast(msg){
+  const e=document.getElementById("toast"); e.textContent=msg; e.classList.add("show");
+  clearTimeout(window.__toast); window.__toast=setTimeout(()=>e.classList.remove("show"),2200);
 }
 
-function clearInput(){
-  document.getElementById('input-code').value=''
-  document.getElementById('output-code').textContent='-- Output will appear here...'
-  setStatus('','ready')
-}
+async function processLua(){
+  const code=document.getElementById("input").value.trim();
+  if(!code){toast("Paste Lua source first");return}
+  let options;
+  try{options=getOptions()}catch(e){toast(e.message);return}
 
-async function doObfuscate(){
-  const code=document.getElementById('input-code').value.trim()
-  if(!code){showToast('Paste some Lua code first');return}
-
-  const btn=document.getElementById('obf-btn')
-  btn.classList.add('loading')
-  btn.disabled=true
-  setStatus('','processing')
-
+  const btn=document.getElementById("process");
+  btn.disabled=true; setStatus("processing","");
   try{
-    const response=await fetch('/api/obfuscate',{
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({code,options:getOpts()})
-    })
-
-    let data
-    try{data=await response.json()}
-    catch{throw new Error('Server returned an invalid response')}
-
+    const response=await fetch("/api/obfuscate",{
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({code,options})
+    });
+    let data;
+    try{data=await response.json()}catch{throw new Error("Server returned invalid JSON")}
     if(!response.ok || !data.ok){
-      const message=data.error ||
-        (Array.isArray(data.errors)
-          ? data.errors.map(e=>e.message||String(e)).join('\\n')
-          : 'Processing failed')
-      throw new Error(message)
+      const msg=data.error || (Array.isArray(data.errors)?data.errors.map(x=>x.message||String(x)).join("\n"):"Processing failed");
+      throw new Error(msg);
     }
-
-    document.getElementById('output-code').textContent=data.output||''
-    setStatus('success','done')
-    burstParticles()
-
-    document.getElementById('pane-out').classList.add('active-glow')
-    setTimeout(()=>document.getElementById('pane-out').classList.remove('active-glow'),2000)
-
-  }catch(err){
-    console.error('[process]',err)
-    document.getElementById('output-code').textContent='-- Processing failed\\n-- '+err.message
-    setStatus('error','failed')
-    showToast(err.message)
-  }finally{
-    btn.classList.remove('loading')
-    btn.disabled=false
-  }
+    document.getElementById("output").textContent=data.output || "";
+    setStatus("done","ok");
+    toast("RegVM processing complete");
+  }catch(e){
+    console.error(e);
+    document.getElementById("output").textContent="-- Processing failed\n-- "+e.message;
+    setStatus("failed","err");
+    toast(e.message);
+  }finally{btn.disabled=false}
 }
 
 function copyOutput(){
-  const out=document.getElementById('output-code').textContent
-  if(!out || out.startsWith('-- Output will appear')){showToast('Nothing to copy');return}
-  navigator.clipboard.writeText(out).then(()=>showToast('Copied!')).catch(()=>showToast('Copy failed'))
+  const text=document.getElementById("output").textContent;
+  if(!text || text.startsWith("-- Output will")) return toast("Nothing to copy");
+  navigator.clipboard.writeText(text).then(()=>toast("Copied!")).catch(()=>toast("Copy failed"));
 }
-
-function randomDigits(length){
-  let out=''
-  if(window.crypto && crypto.getRandomValues){
-    const buf=new Uint32Array(length)
-    crypto.getRandomValues(buf)
-    for(let i=0;i<length;i++) out += String(buf[i] % 10)
-  }else{
-    for(let i=0;i<length;i++) out += Math.floor(Math.random()*10)
-  }
-  return out
-}
-
 function downloadOutput(){
-  const out=document.getElementById('output-code').textContent
-  if(!out || out.startsWith('-- Output will appear')){showToast('Nothing to download');return}
-  const a=document.createElement('a')
-  a.href=URL.createObjectURL(new Blob([out],{type:'text/plain;charset=utf-8'}))
-  a.download='zis_obfuscator_'+randomDigits(10)+'.txt'
-  a.click()
-  URL.revokeObjectURL(a.href)
+  const text=document.getElementById("output").textContent;
+  if(!text || text.startsWith("-- Output will")) return toast("Nothing to download");
+  const a=document.createElement("a");
+  a.href=URL.createObjectURL(new Blob([text],{type:"text/plain;charset=utf-8"}));
+  a.download="regvm_output_"+Date.now()+".lua"; a.click(); URL.revokeObjectURL(a.href);
 }
-
-function setStatus(cls,text){
-  const el=document.getElementById('status-pill')
-  el.className='status-pill'+(cls?' '+cls:'')
-  el.textContent=text||'ready'
-}
-
-function showToast(msg){
-  const t=document.getElementById('toast')
-  t.textContent=msg
-  t.classList.add('show')
-  setTimeout(()=>t.classList.remove('show'),2200)
-}
-
-function burstParticles(){
-  const btn=document.getElementById('obf-btn')
-  const rect=btn.getBoundingClientRect()
-  const cx=rect.left+rect.width/2
-  const cy=rect.top+rect.height/2
-  const colors=['#FF6FD8','#B06AFF','#6A8FFF','#ffffff','#ff99ee']
-
-  for(let i=0;i<28;i++){
-    const p=document.createElement('div')
-    p.className='particle'
-    const angle=(Math.PI*2/28)*i+(Math.random()-.5)*.5
-    const dist=50+Math.random()*80
-    p.style.cssText=`left:${cx-3}px;top:${cy-3}px;background:${colors[Math.floor(Math.random()*colors.length)]};--dx:${Math.cos(angle)*dist}px;--dy:${Math.sin(angle)*dist}px;animation-duration:${.6+Math.random()*.4}s;animation-delay:${Math.random()*.1}s;`
-    document.body.appendChild(p)
-    setTimeout(()=>p.remove(),1200)
-  }
-}
-
-document.getElementById('input-code').addEventListener('focus',()=>{
-  document.getElementById('pane-in').classList.add('active-glow')
-})
-document.getElementById('input-code').addEventListener('blur',()=>{
-  document.getElementById('pane-in').classList.remove('active-glow')
-})
 </script>
 </body>
 </html>
