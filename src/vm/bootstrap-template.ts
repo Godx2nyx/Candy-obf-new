@@ -81,7 +81,7 @@ function obfuscateNum(n: number, rng: () => number): string {
 }
 
 export function generateBootstrap(config: BootstrapConfig): string {
-  const { vmBlob, vmOrigLen, xorKey, invSbox, checksum, chunkName = "Clyde", rng } = config;
+  const { vmBlob, vmOrigLen, xorKey, invSbox, checksum, chunkName = "zisuay", rng } = config;
 
   const prefixes = ["_0", "_1", "_2", "_3", "_4", "_5"];
   const suffixes = "abcdefghjkmnpqrstuvwx".split('');
