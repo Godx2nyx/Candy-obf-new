@@ -3,7 +3,7 @@ import { Renamer, generateName } from "./rename"
 import { StringEncryptor } from "./strings"
 import { CodeGenerator } from "./codegen"
 import { Compiler } from "../compiler/compiler"
-import { generateVM } from "../vm/generator"
+import { generateRegVM } from "../vm/generator"
 
 export interface ObfuscateOptions {
   rename: boolean
@@ -15,7 +15,7 @@ export interface ObfuscateOptions {
 }
 
 export function obfuscate(ast: AST.Block, opts: ObfuscateOptions): string {
-  const seed = opts.seed ?? (Math.random() * 0xFFFFFFFF) >>> 0
+  const seed = opts.seed ?? ((Math.random() * 0xFFFFFFFF) >>> 0)
 
   let tree = ast
 
@@ -27,23 +27,41 @@ export function obfuscate(ast: AST.Block, opts: ObfuscateOptions): string {
   if (opts.vmType !== "none") {
     const compiler = new Compiler()
     const proto = compiler.compile(tree)
-    return generateVM(proto, { seed, minify: opts.minify })
+
+    return generateRegVM(proto, {
+      polymorphicSeed: seed,
+      level: opts.vmLevel
+    })
   }
 
   let decryptorCode = ""
+
   if (opts.encodeStrings) {
     const tableVar = generateName(999, seed ^ 0xDEAD)
     const decoderFn = generateName(998, seed ^ 0xBEEF)
-    const encryptor = new StringEncryptor(seed, tableVar, decoderFn)
+
+    const encryptor = new StringEncryptor(
+      seed,
+      tableVar,
+      decoderFn
+    )
+
     tree = encryptor.transformAST(tree)
     decryptorCode = encryptor.generateDecryptorCode()
   }
 
-  const codegen = new CodeGenerator({ minify: opts.minify })
+  const codegen = new CodeGenerator({
+    minify: opts.minify
+  })
+
   const mainCode = codegen.generate(tree)
 
   const parts: string[] = []
-  if (decryptorCode) parts.push(decryptorCode)
+
+  if (decryptorCode) {
+    parts.push(decryptorCode)
+  }
+
   parts.push(mainCode)
 
   return parts.join("\n")
