@@ -3,7 +3,7 @@ import { Renamer, generateName } from "./rename"
 import { StringEncryptor } from "./strings"
 import { CodeGenerator } from "./codegen"
 import { Compiler } from "../compiler/compiler"
-import { generateRegVM } from "../vm/generator"
+import { generateVM } from "../vm/generator"
 
 export interface ObfuscateOptions {
   rename: boolean
@@ -26,23 +26,11 @@ export function obfuscate(ast: AST.Block, opts: ObfuscateOptions): string {
 
   if (opts.vmType !== "none") {
     const compiler = new Compiler()
-    const rawProto = compiler.compile(tree) as any
+    const rawProto = compiler.compile(tree)
 
-    // แปลงโครงสร้างข้อมูล (Normalize) ป้องกันค่า undefined เมื่อ VM Generator เรียกอ่าน .length
-    const chunk = {
-      ...rawProto,
-      code: rawProto.code ?? rawProto.instructions ?? [],
-      K: rawProto.K ?? rawProto.constants ?? rawProto.consts ?? [],
-      p: rawProto.p ?? rawProto.protos ?? rawProto.prototypes ?? [],
-      nInstructions: rawProto.nInstructions ?? (rawProto.code?.length || rawProto.instructions?.length || 0),
-      maxRegs: rawProto.maxRegs ?? rawProto.maxstacksize ?? rawProto.maxStackSize ?? 0,
-      numParams: rawProto.numParams ?? rawProto.numparams ?? 0,
-      isVararg: rawProto.isVararg ?? rawProto.is_vararg ?? 0,
-    }
-
-    return generateRegVM(chunk as any, {
-      polymorphicSeed: seed,
-      level: opts.vmLevel
+    return generateVM(rawProto, {
+      seed,
+      minify: opts.minify
     })
   }
 
